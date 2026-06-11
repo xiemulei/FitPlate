@@ -1,0 +1,239 @@
+import 'package:flutter/material.dart';
+import '../models/food.dart';
+
+class FoodDetailScreen extends StatefulWidget {
+  /// If null, we're creating a new food
+  final Food? food;
+  final VoidCallback? onDeleted;
+
+  const FoodDetailScreen({super.key, this.food, this.onDeleted});
+
+  @override
+  State<FoodDetailScreen> createState() => _FoodDetailScreenState();
+}
+
+class _FoodDetailScreenState extends State<FoodDetailScreen> {
+  late TextEditingController _nameCtrl;
+  late TextEditingController _proteinCtrl;
+  late TextEditingController _carbsCtrl;
+  bool get _isNew => widget.food == null;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.food?.name ?? '');
+    _proteinCtrl = TextEditingController(
+      text: widget.food?.proteinPer100G.toStringAsFixed(4) ?? '0.00',
+    );
+    _carbsCtrl = TextEditingController(
+      text: widget.food?.carbsPer100G.toStringAsFixed(4) ?? '0.00',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _proteinCtrl.dispose();
+    _carbsCtrl.dispose();
+    super.dispose();
+  }
+
+  Food? _buildFood() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return null;
+    final protein = double.tryParse(_proteinCtrl.text) ?? 0.0;
+    final carbs = double.tryParse(_carbsCtrl.text) ?? 0.0;
+    return Food(
+      id: widget.food?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      proteinPer100G: protein,
+      carbsPer100G: carbs,
+    );
+  }
+
+  void _save() {
+    final food = _buildFood();
+    if (food == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入食物名称')),
+      );
+      return;
+    }
+    Navigator.pop(context, food);
+  }
+
+  void _delete() {
+    if (_isNew) {
+      Navigator.pop(context);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('删除食物'),
+        content: Text('确定要删除「${widget.food!.name}」吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onDeleted?.call();
+              Navigator.pop(context);
+            },
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isNew ? '添加食物' : '编辑食物'),
+        actions: [
+          if (!_isNew)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: _delete,
+              tooltip: '删除',
+            ),
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: _save,
+            tooltip: '保存',
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          // 食物图标
+          Center(
+            child: CircleAvatar(
+              radius: 48,
+              backgroundColor: _isNew
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.primaryContainer,
+              child: Text(
+                _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0].toUpperCase() : '?',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: _isNew
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // 名称
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(
+              labelText: '食物名称',
+              hintText: '如：鸡胸肉、糙米饭',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.restaurant),
+            ),
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 20),
+
+          // 蛋白质
+          TextField(
+            controller: _proteinCtrl,
+            decoration: InputDecoration(
+              labelText: '蛋白质',
+              hintText: '每\$_unit 含多少克蛋白质',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.fitness_center),
+              suffixText: 'g/100g',
+              suffixStyle: TextStyle(color: Colors.grey[500]),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 20),
+
+          // 碳水
+          TextField(
+            controller: _carbsCtrl,
+            decoration: InputDecoration(
+              labelText: '碳水',
+              hintText: '每\$_unit 含多少克碳水',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.grain),
+              suffixText: 'g/100g',
+              suffixStyle: TextStyle(color: Colors.grey[500]),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: 32),
+
+          // 营养信息卡片
+          if (!_isNew) ...[
+            Card(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text('\${widget.food!.unit} 营养成分', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _nutrientCol('蛋白质', '${(widget.food!.proteinPer100G).toStringAsFixed(1)}g', Colors.orange),
+                        _nutrientCol('碳水', '${(widget.food!.carbsPer100G).toStringAsFixed(1)}g', Colors.green),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // 保存按钮
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.check),
+            label: Text(_isNew ? '添加食物' : '保存修改'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          if (!_isNew)
+            TextButton.icon(
+              onPressed: _delete,
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              label: const Text('删除此食物', style: TextStyle(color: Colors.red)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _nutrientCol(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[400])),
+      ],
+    );
+  }
+}
