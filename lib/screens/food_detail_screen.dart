@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
+import '../data/food_data.dart';
 
 class FoodDetailScreen extends StatefulWidget {
   /// If null, we're creating a new food
@@ -16,6 +17,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _proteinCtrl;
   late TextEditingController _carbsCtrl;
+  late String _category;
+  late String? _subcategory;
   bool get _isNew => widget.food == null;
 
   @override
@@ -28,6 +31,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     _carbsCtrl = TextEditingController(
       text: widget.food?.carbsPer100G.toStringAsFixed(4) ?? '0.00',
     );
+    _category = widget.food?.category ?? '未分类';
+    _subcategory = widget.food?.subcategory;
   }
 
   @override
@@ -48,6 +53,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       name: name,
       proteinPer100G: protein,
       carbsPer100G: carbs,
+      category: _category,
+      subcategory: _subcategory,
     );
   }
 
@@ -116,17 +123,13 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           Center(
             child: CircleAvatar(
               radius: 48,
-              backgroundColor: _isNew
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.primaryContainer,
+              backgroundColor: _categoryColor(theme),
               child: Text(
                 _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0].toUpperCase() : '?',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w800,
-                  color: _isNew
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onPrimaryContainer,
+                  color: theme.colorScheme.onPrimaryContainer,
                 ),
               ),
             ),
@@ -148,12 +151,50 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           ),
           const SizedBox(height: 20),
 
+          // 分类选择
+          DropdownButtonFormField<String>(
+            value: _category,
+            decoration: const InputDecoration(
+              labelText: '分类',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.category),
+            ),
+            items: PresetFoods.categories.followedBy(['未分类'])
+                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                .toList(),
+            onChanged: (v) {
+              setState(() {
+                _category = v!;
+                // 切换分类时清除不适用的子分类
+                if (_category != '主食') _subcategory = null;
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // 子分类（主食专用）
+          if (_category == '主食')
+            DropdownButtonFormField<String>(
+              value: _subcategory,
+              decoration: const InputDecoration(
+                labelText: '子分类',
+                hintText: '选择子分类',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.subdirectory_arrow_right),
+              ),
+              items: PresetFoods.subcategoriesOf('主食')
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (v) => setState(() => _subcategory = v),
+            ),
+          if (_category == '主食') const SizedBox(height: 20),
+
           // 蛋白质
           TextField(
             controller: _proteinCtrl,
             decoration: InputDecoration(
               labelText: '蛋白质',
-              hintText: '每\$_unit 含多少克蛋白质',
+              hintText: '每 100g 含多少克蛋白质',
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.fitness_center),
               suffixText: 'g/100g',
@@ -169,7 +210,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             controller: _carbsCtrl,
             decoration: InputDecoration(
               labelText: '碳水',
-              hintText: '每\$_unit 含多少克碳水',
+              hintText: '每 100g 含多少克碳水',
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.grain),
               suffixText: 'g/100g',
@@ -182,20 +223,20 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           const SizedBox(height: 32),
 
           // 营养信息卡片
-          if (!_isNew) ...[
+          if (!_isNew) ...{
             Card(
               color: theme.colorScheme.surfaceContainerHighest,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('\${widget.food!.unit} 营养成分', style: theme.textTheme.titleSmall),
+                    Text('每 100g 营养成分', style: theme.textTheme.titleSmall),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _nutrientCol('蛋白质', '${(widget.food!.proteinPer100G).toStringAsFixed(1)}g', Colors.orange),
-                        _nutrientCol('碳水', '${(widget.food!.carbsPer100G).toStringAsFixed(1)}g', Colors.green),
+                        _nutrientCol('蛋白质', '${widget.food!.proteinPer100G.toStringAsFixed(1)}g', Colors.orange),
+                        _nutrientCol('碳水', '${widget.food!.carbsPer100G.toStringAsFixed(1)}g', Colors.green),
                       ],
                     ),
                   ],
@@ -203,7 +244,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-          ],
+          },
 
           // 保存按钮
           FilledButton.icon(
@@ -225,6 +266,19 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         ],
       ),
     );
+  }
+
+  Color _categoryColor(ThemeData theme) {
+    switch (_category) {
+      case '主食':
+        return Colors.orange.withOpacity(0.3);
+      case '蛋白质-纯瘦肉':
+        return Colors.red.withOpacity(0.3);
+      case '蛋白质-蛋白粉':
+        return Colors.purple.withOpacity(0.3);
+      default:
+        return theme.colorScheme.primaryContainer;
+    }
   }
 
   Widget _nutrientCol(String label, String value, Color color) {

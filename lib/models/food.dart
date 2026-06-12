@@ -4,6 +4,8 @@ class Food {
   final String unit;
   final double proteinPer100G;
   final double carbsPer100G;
+  final String category;       // '主食', '蛋白质-纯瘦肉', '蛋白质-蛋白粉', '未分类'
+  final String? subcategory;   // 主食子类: '米饭粥类', '面食类', '杂粮类', '面包类', '根茎类'
 
   Food({
     required this.id,
@@ -11,11 +13,14 @@ class Food {
     this.unit = 'g/100g',
     required this.proteinPer100G,
     required this.carbsPer100G,
+    this.category = '未分类',
+    this.subcategory,
   });
 
   Map<String, dynamic> toJson() => {
     'id': id, 'name': name, 'unit': unit,
     'proteinPer100G': proteinPer100G, 'carbsPer100G': carbsPer100G,
+    'category': category, 'subcategory': subcategory,
   };
 
   factory Food.fromJson(Map<String, dynamic> j) => Food(
@@ -23,7 +28,17 @@ class Food {
     unit: j['unit'] ?? 'g/100g',
     proteinPer100G: (j['proteinPer100G'] as num).toDouble(),
     carbsPer100G: (j['carbsPer100G'] as num).toDouble(),
+    category: j['category'] ?? '未分类',
+    subcategory: j['subcategory'],
   );
+
+  /// 分类标签（含子类），用于显示
+  String get categoryLabel {
+    if (subcategory != null && subcategory!.isNotEmpty) {
+      return '$category · $subcategory';
+    }
+    return category;
+  }
 }
 
 class MealTarget {

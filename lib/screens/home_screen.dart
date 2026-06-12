@@ -3,6 +3,7 @@ import '../models/food.dart';
 import '../models/cycle.dart';
 import '../models/user_profile.dart';
 import '../services/storage_service.dart';
+import '../data/food_data.dart';
 import 'food_library_screen.dart';
 import 'food_detail_screen.dart';
 import 'meal_planner_screen.dart';
@@ -30,13 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _foods = [
-      Food(id: '1', name: '鸡胸肉', proteinPer100G: 24.0, carbsPer100G: 0.1, unit: 'g/100g'),
-      Food(id: '2', name: '糙米饭', proteinPer100G: 3.0, carbsPer100G: 25.0, unit: 'g/100g'),
-      Food(id: '3', name: '西兰花', proteinPer100G: 3.0, carbsPer100G: 4.0, unit: 'g/100g'),
-      Food(id: '4', name: '鸡蛋', proteinPer100G: 13.0, carbsPer100G: 1.0, unit: '个'),
-      Food(id: '5', name: '三文鱼', proteinPer100G: 22.0, carbsPer100G: 0.1, unit: 'g/100g'),
-    ];
+    _foods = List.from(PresetFoods.all);
   }
 
   Future<void> _loadData() async {
