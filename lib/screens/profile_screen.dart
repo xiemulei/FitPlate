@@ -175,8 +175,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       goal: goal,
     );
 
-    const cellW = 52.0; // 每个体重列宽
-    const labelW = 44.0; // 身高标签列宽
+    // 有力量训练 → 显示 训碳/休碳/蛋白；无力量训练 → 显示 碳水/蛋白
+    final subtitle = isStrengthTraining
+        ? '每格 = 训练日碳水 / 休息日碳水 / 蛋白质 (g/kg)'
+        : '每格 = 碳水 / 蛋白质 (g/kg)';
+    const cellW = 56.0;
+    const labelW = 44.0;
+    final rowH = isStrengthTraining ? 58.0 : 48.0;
 
     showModalBottomSheet(
       context: context,
@@ -212,14 +217,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.w700)),
                 ),
-                // 关闭按钮
                 IconButton(
                   icon: const Icon(Icons.close, size: 20),
                   onPressed: () => Navigator.of(ctx).pop(),
                   visualDensity: VisualDensity.compact,
                 ),
               ]),
-              Text('每格 = 碳水 (g/kg) / 蛋白质 (g/kg)',
+              Text(subtitle,
                   style: TextStyle(color: Colors.grey[400], fontSize: 12)),
               const SizedBox(height: 12),
               // ── 可双向滚动的矩阵 ──
@@ -266,7 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ...heights.map((h) {
                               final isHCur = h == currentHeight;
                               return Container(
-                                height: 50,
+                                height: rowH,
                                 decoration: BoxDecoration(
                                   border: Border(
                                       bottom: BorderSide(
@@ -301,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     return Container(
                                       width: cellW,
                                       padding: const EdgeInsets.symmetric(
-                                          vertical: 4),
+                                          vertical: 3),
                                       decoration: BoxDecoration(
                                         color: isCur
                                             ? theme
@@ -318,31 +322,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                       ),
                                       child: val != null
-                                          ? Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Text(
-                                                    val.$1
-                                                        .toStringAsFixed(1),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: isCur
-                                                          ? FontWeight.w800
-                                                          : FontWeight.w500,
-                                                      color: isCur
-                                                          ? theme.colorScheme
-                                                              .primary
-                                                          : null,
-                                                    )),
-                                                Text(
-                                                    '/ ${val.$3.toStringAsFixed(1)}',
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color:
-                                                          Colors.grey[500],
-                                                    )),
-                                              ],
+                                          ? _buildCellContent(
+                                              isStrengthTraining,
+                                              val,
+                                              isCur,
+                                              theme,
                                             )
                                           : Center(
                                               child: Text('-',
@@ -394,6 +378,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  /// 根据是否有力量训练构建不同格式的单元格内容
+  Widget _buildCellContent(
+    bool isStrengthTraining,
+    (double, double, double) val,
+    bool isCurrent,
+    ThemeData theme,
+  ) {
+    // val = (carb1, carb2, protein)
+    //   无力训：carb1 = carb2 = 每日碳水
+    //   健身：  carb1 = 训练日碳水, carb2 = 休息日碳水
+    if (isStrengthTraining) {
+      // 3行：训练日碳水 / 休息日碳水 / 蛋白质
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(val.$1.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                color: isCurrent ? theme.colorScheme.primary : null,
+                height: 1.2,
+              )),
+          Text(val.$2.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
+                color: isCurrent
+                    ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                    : Colors.grey[500],
+                height: 1.3,
+              )),
+          Text(val.$3.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                color: isCurrent ? theme.colorScheme.primary : null,
+                height: 1.2,
+              )),
+        ],
+      );
+    } else {
+      // 2行：碳水 / 蛋白质
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(val.$1.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                color: isCurrent ? theme.colorScheme.primary : null,
+                height: 1.2,
+              )),
+          Text(val.$3.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
+                color: isCurrent
+                    ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                    : Colors.grey[500],
+                height: 1.2,
+              )),
+        ],
+      );
+    }
   }
 
   Widget _legendDot(Color color) {
