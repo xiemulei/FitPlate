@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
+import '../utils/meal_utils.dart';
 
 class ResultScreen extends StatefulWidget {
   final List<Food> foods;

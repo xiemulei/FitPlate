@@ -169,42 +169,7 @@ class MealType {
   ];
 }
 
-/// 计算结果辅助：将克数转换为食物对应的显示单位
-class FoodAmountFormatter {
-  /// 将计算出的克数转换为食物对应的单位显示文本
-  /// 例如：对于"鸡蛋(个)"，150g → "3个"（如果1个=50g）
-  static String formatAmount(Food food, double grams) {
-    if (food.unit.isItemUnit &&
-        food.gramsPerUnit != null &&
-        food.gramsPerUnit! > 0) {
-      final count = grams / food.gramsPerUnit!;
-      return '${count.toStringAsFixed(1)}${food.unit.label}';
-    }
-    return '${grams.toStringAsFixed(0)}g';
-  }
-}
-
-class MealCalculator {
-  /// 计算每种食物的最终克数（按蛋白质目标缩放）
-  static Map<Food, double> calculate({
-    required MealTarget target,
-    required List<Food> allFoods,
-    required List<SelectedFood> selected,
-  }) {
-    final selFoods = selected.map((sf) {
-      final food = allFoods.firstWhere((f) => f.id == sf.foodId);
-      return (food, sf.ratio);
-    }).toList();
-
-    final totalWeightedProtein =
-        selFoods.fold(0.0, (sum, f) => sum + f.$1.proteinPer100G / 100 * f.$2);
-    if (totalWeightedProtein <= 0) return {};
-
-    final k = target.protein / totalWeightedProtein;
-    return {for (final f in selFoods) f.$1: f.$2 * k};
-  }
-}
-
+// MealCalculator 和 FoodAmountFormatter 已移至 lib/utils/meal_utils.dart
 class PlanSlot {
   final int day;
   final int meal;

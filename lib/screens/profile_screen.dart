@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../models/food.dart';
 import '../data/nutrition_reference.dart';
+import '../widgets/nutrient_display.dart';
 import 'template_list_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -637,7 +638,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ]),
                   const SizedBox(height: 16),
                   Row(children: [
-                    _TargetColumn(
+                    NutrientColumn(
                         icon: Icons.fitness_center,
                         label: '蛋白质',
                         value: '${_calcDailyProtein().toStringAsFixed(0)}g',
@@ -647,7 +648,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 1,
                         color: theme.colorScheme.onPrimaryContainer
                             .withValues(alpha: 0.2)),
-                    _TargetColumn(
+                    NutrientColumn(
                         icon: Icons.grain,
                         label: '碳水',
                         value: '${_calcDailyCarbs().toStringAsFixed(0)}g',
@@ -657,7 +658,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 1,
                         color: theme.colorScheme.onPrimaryContainer
                             .withValues(alpha: 0.2)),
-                    _TargetColumn(
+                    NutrientColumn(
                         icon: Icons.local_fire_department,
                         label: '卡路里',
                         value: _calcDailyCalories().toStringAsFixed(0),
@@ -757,30 +758,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _calcDailyProtein() * 4 + _calcDailyCarbs() * 4;
 }
 
-class _TargetColumn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _TargetColumn({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-        child: Column(children: [
-      Icon(icon, color: color.withValues(alpha: 0.7), size: 28),
-      const SizedBox(height: 4),
-      Text(value,
-          style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.w800, color: color)),
-      Text(label,
-          style: TextStyle(fontSize: 13, color: color.withValues(alpha: 0.7))),
-    ]));
-  }
-}
