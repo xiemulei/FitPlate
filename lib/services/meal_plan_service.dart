@@ -18,7 +18,7 @@ class MealPlanService {
     final todayDay = activeCycle.todayDay;
     if (todayDay == null) return null;
 
-    return _generateDayMeals(
+    return generateDayMeals(
       isRestDay: todayDay.isRestDay,
       profile: profile,
       trainingTime: activeCycle.trainingTime ?? profile.trainingTime,
@@ -31,7 +31,7 @@ class MealPlanService {
     required UserProfile profile,
   }) {
     return cycle.days.map((day) {
-      return _generateDayMeals(
+      return generateDayMeals(
         isRestDay: day.isRestDay,
         profile: profile,
         trainingTime: cycle.trainingTime ?? profile.trainingTime,
@@ -40,7 +40,7 @@ class MealPlanService {
   }
 
   /// 单日生成
-  static List<MealPlanEntry> _generateDayMeals({
+  static List<MealPlanEntry> generateDayMeals({
     required bool isRestDay,
     required UserProfile profile,
     required TrainingTime trainingTime,
