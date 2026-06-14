@@ -1,3 +1,5 @@
+import '../utils/constants.dart';
+
 /// 食物单位枚举
 enum FoodUnit {
   grams100g('g/100g'), // 默认
@@ -30,8 +32,8 @@ class Food {
   final FoodUnit unit;
   final double proteinPer100G;
   final double carbsPer100G;
-  final String category; // '主食', '蛋白质-纯瘦肉', '蛋白质-蛋白粉', '未分类'
-  final String? subcategory; // 主食子类: '米饭粥类', '面食类', '杂粮类', '面包类', '根茎类'
+  final String category; // 分类，使用 FoodCategory 常量
+  final String? subcategory; // 主食子类，使用 FoodCategory.Subcategory 常量
   /// 对于"个/份/杯"等按件计量的单位，每件相当于多少克
   /// 例如：1个鸡蛋=50g，1份米饭=200g，1杯牛奶=250ml
   final double? gramsPerUnit;
@@ -42,7 +44,7 @@ class Food {
     this.unit = FoodUnit.grams100g,
     required this.proteinPer100G,
     required this.carbsPer100G,
-    this.category = '未分类',
+    this.category = FoodCategory.uncategorized,
     this.subcategory,
     this.gramsPerUnit,
   });
@@ -83,7 +85,7 @@ class Food {
             : FoodUnit.grams100g,
         proteinPer100G: (j['proteinPer100G'] as num).toDouble(),
         carbsPer100G: (j['carbsPer100G'] as num).toDouble(),
-        category: j['category'] ?? '未分类',
+        category: j['category'] ?? FoodCategory.uncategorized,
         subcategory: j['subcategory'],
         gramsPerUnit: (j['gramsPerUnit'] as num?)?.toDouble(),
       );
@@ -98,9 +100,14 @@ class Food {
 }
 
 class MealTarget {
-  double protein;
-  double carbs;
-  MealTarget({required this.protein, required this.carbs});
+  final double protein;
+  final double carbs;
+  const MealTarget({required this.protein, required this.carbs});
+
+  MealTarget copyWith({double? protein, double? carbs}) => MealTarget(
+        protein: protein ?? this.protein,
+        carbs: carbs ?? this.carbs,
+      );
 
   Map<String, dynamic> toJson() => {'protein': protein, 'carbs': carbs};
   factory MealTarget.fromJson(Map<String, dynamic> j) => MealTarget(

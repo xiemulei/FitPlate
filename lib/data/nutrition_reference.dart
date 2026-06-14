@@ -785,6 +785,57 @@ class NutritionReference {
     return '增肌（力量训练）';
   }
 
+  /// 获取当前场景下的完整身高×体重对照表。
+  ///
+  /// 返回 Map<身高cm, Map<体重kg, (训练日碳水, 休息日碳水, 蛋白质)?>>。
+  /// null 值表示该身高/体重组合无可参考数据（大多为过轻/过重偏离范围）。
+  static Map<int, Map<int, (double, double, double)?>> getFullTable({
+    required bool isMale,
+    required bool isStrengthTraining,
+    required FitnessGoal goal,
+  }) {
+    final rawTable = _selectTable(isMale, isStrengthTraining, goal);
+    final result = <int, Map<int, (double, double, double)?>>{};
+    for (final hEntry in rawTable.entries) {
+      final weightMap = <int, (double, double, double)?>{};
+      for (final wEntry in hEntry.value.entries) {
+        final val = wEntry.value;
+        if (val == null) {
+          weightMap[wEntry.key] = null;
+        } else {
+          weightMap[wEntry.key] = _normalizeFactor(val);
+        }
+      }
+      result[hEntry.key] = weightMap;
+    }
+    return result;
+  }
+
+  /// 获取场景标题文字（如"男性 — 减脂（力量训练）"）
+  static String scenarioTitle({
+    required bool isMale,
+    required bool isStrengthTraining,
+    required FitnessGoal goal,
+  }) {
+    final genderLabel = isMale ? '男性' : '女性';
+    return '$genderLabel — ${_scenarioLabel(isStrengthTraining, goal)}';
+  }
+
+  /// 根据条件选择对应的数据表
+  static Map<int, Map<int, dynamic>> _selectTable(
+    bool isMale,
+    bool isStrengthTraining,
+    FitnessGoal goal,
+  ) {
+    if (!isStrengthTraining) {
+      return isMale ? nutritionMale : nutritionFemale;
+    }
+    if (goal == FitnessGoal.fatLoss) {
+      return isMale ? maleFatLoss : femaleFatLoss;
+    }
+    return isMale ? maleMuscleGain : femaleMuscleGain;
+  }
+
   /// 根据性别、身高、体重查表获取营养系数（保留向后兼容）
   /// 返回 (carbs_g_per_kg, protein_g_per_kg) 或 null
   static (double, double)? getFactor({

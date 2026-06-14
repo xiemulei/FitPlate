@@ -1,4 +1,5 @@
 import '../models/food.dart';
+import '../utils/constants.dart';
 
 /// 预设食物库 —— 常见食物的营养成分（每100g可食部）
 class PresetFoods {
@@ -31,14 +32,20 @@ class PresetFoods {
 
   /// 获取所有可选的分类名称
   static const List<String> categories = [
-    '主食',
-    '蛋白质-纯瘦肉',
-    '蛋白质-蛋白粉',
+    FoodCategory.staple,
+    FoodCategory.leanProtein,
+    FoodCategory.proteinPowder,
   ];
 
   /// 主食子分类
   static const Map<String, List<String>> subcategories = {
-    '主食': ['米饭粥类', '面食类', '杂粮类', '面包类', '根茎类'],
+    FoodCategory.staple: [
+      StapleSubcategory.ricePorridge,
+      StapleSubcategory.noodles,
+      StapleSubcategory.grains,
+      StapleSubcategory.bread,
+      StapleSubcategory.rootTubers,
+    ],
   };
 
   /// 可选的子分类（用于新增食物时的选择器）

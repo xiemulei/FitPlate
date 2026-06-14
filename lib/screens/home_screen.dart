@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   List<Food> _foods = [];
-  final MealTarget _target = MealTarget(protein: 35.0, carbs: 45.0);
+  MealTarget _target = const MealTarget(protein: 35.0, carbs: 45.0);
   List<SelectedFood> _selected = [];
   List<MealTemplate> _templates = [];
   List<TrainingCycle> _cycles = [];
@@ -78,8 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
         target: _target,
         selected: _selected,
         onTargetChanged: (t) => setState(() {
-          _target.protein = t.protein;
-          _target.carbs = t.carbs;
+          _target = t;
         }),
         onSelectedChanged: (s) => setState(() => _selected = s),
         templates: _templates,

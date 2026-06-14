@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../data/food_data.dart';
+import '../utils/constants.dart';
 import 'food_detail_screen.dart';
 
 class FoodLibraryScreen extends StatelessWidget {
@@ -195,11 +196,11 @@ class FoodLibraryScreen extends StatelessWidget {
 
   IconData _categoryIcon(String category) {
     switch (category) {
-      case '主食':
+      case FoodCategory.staple:
         return Icons.rice_bowl;
-      case '蛋白质-纯瘦肉':
+      case FoodCategory.leanProtein:
         return Icons.cookie;
-      case '蛋白质-蛋白粉':
+      case FoodCategory.proteinPowder:
         return Icons.bolt;
       default:
         return Icons.restaurant;
@@ -208,11 +209,11 @@ class FoodLibraryScreen extends StatelessWidget {
 
   Color _categoryColor(String category, ThemeData theme) {
     switch (category) {
-      case '主食':
+      case FoodCategory.staple:
         return Colors.orange.withOpacity(0.2);
-      case '蛋白质-纯瘦肉':
+      case FoodCategory.leanProtein:
         return Colors.red.withOpacity(0.2);
-      case '蛋白质-蛋白粉':
+      case FoodCategory.proteinPowder:
         return Colors.purple.withOpacity(0.2);
       default:
         return theme.colorScheme.primaryContainer;

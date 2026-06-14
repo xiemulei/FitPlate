@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../data/food_data.dart';
+import '../utils/constants.dart';
 
 class FoodDetailScreen extends StatefulWidget {
   /// If null, we're creating a new food
@@ -34,7 +35,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       text: widget.food?.carbsPer100G.toStringAsFixed(4) ?? '0.00',
     );
     _unit = widget.food?.unit ?? FoodUnit.grams100g;
-    _category = widget.food?.category ?? '未分类';
+    _category = widget.food?.category ?? FoodCategory.uncategorized;
     _subcategory = widget.food?.subcategory;
     _gramsPerUnitCtrl = TextEditingController(
       text: widget.food?.gramsPerUnit?.toStringAsFixed(1) ?? '',
@@ -220,21 +221,21 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               prefixIcon: Icon(Icons.category),
             ),
             items: PresetFoods.categories
-                .followedBy(['未分类'])
+                .followedBy([FoodCategory.uncategorized])
                 .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                 .toList(),
             onChanged: (v) {
               setState(() {
                 _category = v!;
                 // 切换分类时清除不适用的子分类
-                if (_category != '主食') _subcategory = null;
+                if (_category != FoodCategory.staple) _subcategory = null;
               });
             },
           ),
           const SizedBox(height: 20),
 
           // 子分类（主食专用）
-          if (_category == '主食')
+          if (_category == FoodCategory.staple)
             DropdownButtonFormField<String>(
               value: _subcategory,
               decoration: const InputDecoration(
@@ -243,12 +244,12 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.subdirectory_arrow_right),
               ),
-              items: PresetFoods.subcategoriesOf('主食')
+              items: PresetFoods.subcategoriesOf(FoodCategory.staple)
                   .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                   .toList(),
               onChanged: (v) => setState(() => _subcategory = v),
             ),
-          if (_category == '主食') const SizedBox(height: 20),
+          if (_category == FoodCategory.staple) const SizedBox(height: 20),
 
           // 蛋白质
           TextField(
@@ -353,11 +354,11 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 
   Color _categoryColor(ThemeData theme) {
     switch (_category) {
-      case '主食':
+      case FoodCategory.staple:
         return Colors.orange.withOpacity(0.3);
-      case '蛋白质-纯瘦肉':
+      case FoodCategory.leanProtein:
         return Colors.red.withOpacity(0.3);
-      case '蛋白质-蛋白粉':
+      case FoodCategory.proteinPowder:
         return Colors.purple.withOpacity(0.3);
       default:
         return theme.colorScheme.primaryContainer;

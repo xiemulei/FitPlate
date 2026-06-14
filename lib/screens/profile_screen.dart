@@ -148,9 +148,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showRefTable() {
-    final goal = widget.profile.goal;
-    final rows = MacroReferenceRow.forGoal(goal);
-    final title = goal == FitnessGoal.fatLoss ? '减脂 - 每千克摄入参考' : '增肌 - 每千克摄入参考';
+    final p = widget.profile;
+    final isMale = p.gender == Gender.male;
+    final isStrengthTraining = !p.noStrengthTraining;
+    final goal = p.goal;
+    final currentHeight = p.height.round();
+    final currentWeight = p.weight.round();
+
+    final table = NutritionReference.getFullTable(
+      isMale: isMale,
+      isStrengthTraining: isStrengthTraining,
+      goal: goal,
+    );
+    if (table.isEmpty) return;
+
+    final heights = table.keys.toList()..sort();
+    final allWeights = <int>{};
+    for (final h in heights) {
+      allWeights.addAll(table[h]!.keys);
+    }
+    final weights = allWeights.toList()..sort();
+
+    final title = NutritionReference.scenarioTitle(
+      isMale: isMale,
+      isStrengthTraining: isStrengthTraining,
+      goal: goal,
+    );
+
+    const cellW = 52.0; // 每个体重列宽
+    const labelW = 44.0; // 身高标签列宽
 
     showModalBottomSheet(
       context: context,
@@ -160,128 +186,222 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        return DraggableScrollableSheet(
-          initialChildSize: 0.55,
-          minChildSize: 0.4,
-          maxChildSize: 0.8,
-          expand: false,
-          builder: (_, scrollCtrl) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: ListView(
-                controller: scrollCtrl,
-                children: [
-                  // 拖拽指示条
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+        final totalWidth = labelW + weights.length * cellW;
+
+        return SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.78,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(children: [
+              // ── 拖拽指示条 ──
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  const SizedBox(height: 12),
-                  Text(title,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // ── 标题 ──
+              Row(children: [
+                Expanded(
+                  child: Text(title,
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(
-                    '以下为常见推荐范围，可据此调整上方的每千克摄入量',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  // 表头
-                  Container(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(8)),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(children: [
-                      _th('强度', flex: 1),
-                      _th('蛋白质 (g/kg)', flex: 2),
-                      _th('碳水 (g/kg)', flex: 2),
-                    ]),
-                  ),
-                  // 表体
-                  ...rows.asMap().entries.map((e) {
-                    final idx = e.key;
-                    final row = e.value;
-                    final isLast = idx == rows.length - 1;
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: idx.isEven
-                            ? Colors.transparent
-                            : theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.3),
-                        borderRadius: isLast
-                            ? const BorderRadius.vertical(
-                                bottom: Radius.circular(8))
-                            : null,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
-                      child: Row(children: [
-                        _td(row.intensity, flex: 1),
-                        _td(row.proteinRange, flex: 2),
-                        _td(row.carbRange, flex: 2),
-                      ]),
-                    );
-                  }),
-                  const SizedBox(height: 12),
-                  // 备注
-                  ...rows.map((r) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
+                ),
+                // 关闭按钮
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ]),
+              Text('每格 = 碳水 (g/kg) / 蛋白质 (g/kg)',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+              const SizedBox(height: 12),
+              // ── 可双向滚动的矩阵 ──
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: totalWidth,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('· ',
-                                style: TextStyle(
-                                    color: Colors.grey[400], fontSize: 12)),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(
-                                      color: Colors.grey[400], fontSize: 12),
-                                  children: [
-                                    TextSpan(
-                                        text: r.intensity,
-                                        style: const TextStyle(
+                            // ═══ 表头行 ═══
+                            Container(
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(8)),
+                              ),
+                              child: Row(children: [
+                                SizedBox(
+                                  width: labelW,
+                                  child: Center(
+                                    child: Text('身高↓',
+                                        style: TextStyle(
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w600)),
-                                    TextSpan(text: '：${r.note}'),
-                                  ],
+                                  ),
                                 ),
+                                ...weights.map((w) => SizedBox(
+                                      width: cellW,
+                                      child: Center(
+                                        child: Text('$w',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                    )),
+                              ]),
+                            ),
+                            // ═══ 数据行 ═══
+                            ...heights.map((h) {
+                              final isHCur = h == currentHeight;
+                              return Container(
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                      bottom: BorderSide(
+                                          color: Colors.grey
+                                              .withValues(alpha: 0.12))),
+                                ),
+                                child: Row(children: [
+                                  // 身高标签
+                                  SizedBox(
+                                    width: labelW,
+                                    child: Container(
+                                      color: isHCur
+                                          ? theme.colorScheme.primaryContainer
+                                              .withValues(alpha: 0.3)
+                                          : null,
+                                      child: Center(
+                                        child: Text('$h',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: isHCur
+                                                  ? FontWeight.w700
+                                                  : FontWeight.normal,
+                                            )),
+                                      ),
+                                    ),
+                                  ),
+                                  // 各体重列
+                                  ...weights.map((w) {
+                                    final val = table[h]?[w];
+                                    final isCur =
+                                        isHCur && w == currentWeight;
+                                    return Container(
+                                      width: cellW,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isCur
+                                            ? theme
+                                                .colorScheme.primary
+                                                .withValues(alpha: 0.15)
+                                            : (val != null
+                                                ? Colors.transparent
+                                                : Colors.grey
+                                                    .withValues(alpha: 0.04)),
+                                        border: Border(
+                                          left: BorderSide(
+                                              color: Colors.grey
+                                                  .withValues(alpha: 0.12)),
+                                        ),
+                                      ),
+                                      child: val != null
+                                          ? Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                    val.$1
+                                                        .toStringAsFixed(1),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: isCur
+                                                          ? FontWeight.w800
+                                                          : FontWeight.w500,
+                                                      color: isCur
+                                                          ? theme.colorScheme
+                                                              .primary
+                                                          : null,
+                                                    )),
+                                                Text(
+                                                    '/ ${val.$3.toStringAsFixed(1)}',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color:
+                                                          Colors.grey[500],
+                                                    )),
+                                              ],
+                                            )
+                                          : Center(
+                                              child: Text('-',
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      color:
+                                                          Colors.grey[400])),
+                                            ),
+                                    );
+                                  }),
+                                ]),
+                              );
+                            }),
+                            // ═══ 底部圆角 ═══
+                            Container(
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                borderRadius: const BorderRadius.vertical(
+                                    bottom: Radius.circular(8)),
                               ),
                             ),
-                          ],
-                        ),
-                      )),
-                ],
+                            // ═══ 图例 ═══
+                            const SizedBox(height: 8),
+                            Row(children: [
+                              _legendDot(theme.colorScheme.primary
+                                  .withValues(alpha: 0.15)),
+                              const SizedBox(width: 4),
+                              Text('= 当前位置',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[500])),
+                              const SizedBox(width: 16),
+                              _legendDot(
+                                  Colors.grey.withValues(alpha: 0.04)),
+                              const SizedBox(width: 4),
+                              Text('= 无数据',
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[500])),
+                            ]),
+                          ]),
+                    ),
+                  ),
+                ),
               ),
-            );
-          },
+            ]),
+          ),
         );
       },
     );
   }
 
-  Widget _th(String text, {int flex = 1}) {
-    return Expanded(
-      flex: flex,
-      child: Text(text,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-    );
-  }
-
-  Widget _td(String text, {int flex = 1}) {
-    return Expanded(
-      flex: flex,
-      child: Text(text, style: const TextStyle(fontSize: 14)),
-    );
+  Widget _legendDot(Color color) {
+    return Container(width: 12, height: 12, decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(2),
+      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+    ));
   }
 
   @override

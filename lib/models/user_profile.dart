@@ -134,16 +134,27 @@ class UserProfile {
 
   bool get showNoStrengthOption => goal == FitnessGoal.fatLoss;
 
-  UserProfile copy() => UserProfile(
-        height: height,
-        weight: weight,
-        age: age,
-        gender: gender,
-        goal: goal,
-        trainingTime: trainingTime,
-        noStrengthTraining: noStrengthTraining,
-        proteinPerKg: proteinPerKg,
-        carbsPerKg: carbsPerKg,
+  UserProfile copyWith({
+    double? height,
+    double? weight,
+    int? age,
+    Gender? gender,
+    FitnessGoal? goal,
+    TrainingTime? trainingTime,
+    bool? noStrengthTraining,
+    double? proteinPerKg,
+    double? carbsPerKg,
+  }) =>
+      UserProfile(
+        height: height ?? this.height,
+        weight: weight ?? this.weight,
+        age: age ?? this.age,
+        gender: gender ?? this.gender,
+        goal: goal ?? this.goal,
+        trainingTime: trainingTime ?? this.trainingTime,
+        noStrengthTraining: noStrengthTraining ?? this.noStrengthTraining,
+        proteinPerKg: proteinPerKg ?? this.proteinPerKg,
+        carbsPerKg: carbsPerKg ?? this.carbsPerKg,
       );
 
   Map<String, dynamic> toJson() => {
