@@ -120,9 +120,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         goal: p.goal,
       );
       _hasAppliedRecommendation = true;
-      // 自动填入查表推荐值
-      p.proteinPerKg = result.$2;
-      p.carbsPerKg = result.$1;
+      // 只更新输入框预览，不直接修改 profile 对象
+      // 用户需点击「保存」或「应用推荐」才会实际写入
       _proteinKgCtrl.text = result.$2.toStringAsFixed(1);
       _carbsKgCtrl.text = result.$1.toStringAsFixed(1);
       _userTweakedProtein = false;
