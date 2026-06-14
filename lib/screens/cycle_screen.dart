@@ -22,86 +22,147 @@ class _CycleScreenState extends State<CycleScreen> {
   void _createCycle() {
     final nameCtrl = TextEditingController();
     final lengthCtrl = TextEditingController(text: '4');
+    String? selectedPreset;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('创建新循环'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: '循环名称',
-                hintText: '如：三分化训练',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('创建新循环'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: '循环名称',
+                  hintText: '如：三分化训练',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: lengthCtrl,
-              decoration: const InputDecoration(
-                labelText: '循环天数',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_view_day),
+              const SizedBox(height: 16),
+              Text('快速预设',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('🏋️ 三分化（练三休一）'),
+                    onPressed: () {
+                      nameCtrl.text = '三分化训练';
+                      lengthCtrl.text = '4';
+                      setDialogState(() => selectedPreset = '三分化');
+                    },
+                  ),
+                  ActionChip(
+                    label: const Text('🏋️ 四分化（练二休一循环）'),
+                    onPressed: () {
+                      nameCtrl.text = '四分化训练';
+                      lengthCtrl.text = '3';
+                      setDialogState(() => selectedPreset = '四分化');
+                    },
+                  ),
+                  ActionChip(
+                    label: const Text('自定义'),
+                    onPressed: () {
+                      setDialogState(() => selectedPreset = null);
+                    },
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [3, 4, 5, 6, 7].map((n) => ActionChip(
-                label: Text('$n天'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lengthCtrl,
+                decoration: const InputDecoration(
+                  labelText: '循环天数',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.calendar_view_day),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [3, 4, 5, 6, 7]
+                    .map((n) => ActionChip(
+                          label: Text('$n天'),
+                          onPressed: () {
+                            lengthCtrl.text = n.toString();
+                            setDialogState(() {});
+                          },
+                        ))
+                    .toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            FilledButton(
                 onPressed: () {
-                  lengthCtrl.text = n.toString();
-                  setState(() {});
+                  final name = nameCtrl.text.trim();
+                  final length = int.tryParse(lengthCtrl.text) ?? 4;
+                  if (name.isEmpty) return;
+
+                  List<CycleDay> days;
+                  if (selectedPreset == '三分化') {
+                    days = [
+                      CycleDay(dayIndex: 0, label: '胸/推', isRestDay: false),
+                      CycleDay(dayIndex: 1, label: '背/拉', isRestDay: false),
+                      CycleDay(dayIndex: 2, label: '腿', isRestDay: false),
+                      CycleDay(dayIndex: 3, label: '休息日', isRestDay: true),
+                    ];
+                  } else if (selectedPreset == '四分化') {
+                    days = [
+                      CycleDay(dayIndex: 0, label: '上肢推', isRestDay: false),
+                      CycleDay(dayIndex: 1, label: '上肢拉', isRestDay: false),
+                      CycleDay(dayIndex: 2, label: '休息日', isRestDay: true),
+                    ];
+                  } else {
+                    days = List.generate(
+                        length,
+                        (i) => CycleDay(
+                              dayIndex: i,
+                              label: i == length - 1 ? '休息日' : '训练日${i + 1}',
+                              isRestDay: i == length - 1,
+                            ));
+                  }
+
+                  final cycle = TrainingCycle(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: name,
+                    cycleLength: days.length,
+                    days: days,
+                    startDate: DateTime.now().toIso8601String().split('T')[0],
+                    isActive: widget.cycles.isEmpty,
+                  );
+
+                  widget.onCyclesChanged([...widget.cycles, cycle]);
+                  Navigator.pop(ctx);
                 },
-              )).toList(),
-            ),
+                child: const Text('创建')),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(onPressed: () {
-            final name = nameCtrl.text.trim();
-            final length = int.tryParse(lengthCtrl.text) ?? 4;
-            if (name.isEmpty) return;
-
-            final days = List.generate(length, (i) => CycleDay(
-              dayIndex: i,
-              label: i == length - 1 ? '休息日' : '训练日${i + 1}',
-              isRestDay: i == length - 1,
-            ));
-
-            final cycle = TrainingCycle(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              name: name,
-              cycleLength: length,
-              days: days,
-              startDate: DateTime.now().toIso8601String().split('T')[0],
-              isActive: widget.cycles.isEmpty,
-            );
-
-            widget.onCyclesChanged([...widget.cycles, cycle]);
-            Navigator.pop(ctx);
-          }, child: const Text('创建')),
-        ],
       ),
     );
   }
 
   void _editCycle(TrainingCycle cycle) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _CycleEditor(
-        cycle: cycle,
-        templates: widget.templates,
-        onSave: (updated) {
-          widget.onCyclesChanged(widget.cycles.map((c) => c.id == updated.id ? updated : c).toList());
-        },
-      ),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _CycleEditor(
+            cycle: cycle,
+            templates: widget.templates,
+            onSave: (updated) {
+              widget.onCyclesChanged(widget.cycles
+                  .map((c) => c.id == updated.id ? updated : c)
+                  .toList());
+            },
+          ),
+        ));
   }
 
   void _toggleActive(TrainingCycle cycle) {
@@ -121,12 +182,14 @@ class _CycleScreenState extends State<CycleScreen> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: '${cycle.name} (副本)',
       cycleLength: cycle.cycleLength,
-      days: cycle.days.map((d) => CycleDay(
-        dayIndex: d.dayIndex,
-        label: d.label,
-        isRestDay: d.isRestDay,
-        mealTemplateId: d.mealTemplateId,
-      )).toList(),
+      days: cycle.days
+          .map((d) => CycleDay(
+                dayIndex: d.dayIndex,
+                label: d.label,
+                isRestDay: d.isRestDay,
+                mealTemplateId: d.mealTemplateId,
+              ))
+          .toList(),
       startDate: null,
       isActive: false,
     );
@@ -143,11 +206,13 @@ class _CycleScreenState extends State<CycleScreen> {
         title: const Text('删除循环'),
         content: Text('确定删除「${cycle.name}」吗？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              widget.onCyclesChanged(widget.cycles.where((c) => c.id != cycle.id).toList());
+              widget.onCyclesChanged(
+                  widget.cycles.where((c) => c.id != cycle.id).toList());
               Navigator.pop(ctx);
             },
             child: const Text('删除'),
@@ -164,19 +229,26 @@ class _CycleScreenState extends State<CycleScreen> {
         title: const Text('重置开始日期'),
         content: const Text('将循环的开始日期设为今天？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(onPressed: () {
-            widget.onCyclesChanged(widget.cycles.map((c) {
-              if (c.id == cycle.id) {
-                return c.copyWith(startDate: DateTime.now().toIso8601String().split('T')[0]);
-              }
-              return c;
-            }).toList());
-            Navigator.pop(ctx);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('开始日期已重置为今天'), duration: Duration(seconds: 2)),
-            );
-          }, child: const Text('重置')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+              onPressed: () {
+                widget.onCyclesChanged(widget.cycles.map((c) {
+                  if (c.id == cycle.id) {
+                    return c.copyWith(
+                        startDate:
+                            DateTime.now().toIso8601String().split('T')[0]);
+                  }
+                  return c;
+                }).toList());
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('开始日期已重置为今天'),
+                      duration: Duration(seconds: 2)),
+                );
+              },
+              child: const Text('重置')),
         ],
       ),
     );
@@ -191,7 +263,9 @@ class _CycleScreenState extends State<CycleScreen> {
       children: [
         Row(
           children: [
-            Text('训练循环', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('训练循环',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
             FilledButton.icon(
               onPressed: _createCycle,
@@ -205,7 +279,7 @@ class _CycleScreenState extends State<CycleScreen> {
           Padding(
             padding: const EdgeInsets.all(8),
             child: Text('提示: 先在「配餐」页面保存一些配餐模板，然后分配到循环的每一天',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
           ),
         const SizedBox(height: 4),
         if (widget.cycles.isEmpty)
@@ -216,25 +290,27 @@ class _CycleScreenState extends State<CycleScreen> {
                 children: [
                   Icon(Icons.loop, size: 64, color: Colors.grey[600]),
                   const SizedBox(height: 16),
-                  Text('还没有循环', style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
+                  Text('还没有循环',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(color: Colors.grey)),
                   const SizedBox(height: 8),
                   Text('点击新建创建你的第一个训练循环',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                      style: TextStyle(color: Colors.grey[500], fontSize: 13)),
                 ],
               ),
             ),
           )
         else
           ...widget.cycles.map((cycle) => _CycleCard(
-            cycle: cycle,
-            templates: widget.templates,
-            theme: theme,
-            onTap: () => _editCycle(cycle),
-            onToggle: () => _toggleActive(cycle),
-            onCopy: () => _copyCycle(cycle),
-            onResetDate: () => _resetCycleDate(cycle),
-            onDelete: () => _deleteCycle(cycle),
-          )),
+                cycle: cycle,
+                templates: widget.templates,
+                theme: theme,
+                onTap: () => _editCycle(cycle),
+                onToggle: () => _toggleActive(cycle),
+                onCopy: () => _copyCycle(cycle),
+                onResetDate: () => _resetCycleDate(cycle),
+                onDelete: () => _deleteCycle(cycle),
+              )),
       ],
     );
   }
@@ -251,9 +327,14 @@ class _CycleCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _CycleCard({
-    required this.cycle, required this.templates, required this.theme,
-    required this.onTap, required this.onToggle, required this.onCopy,
-    required this.onResetDate, required this.onDelete,
+    required this.cycle,
+    required this.templates,
+    required this.theme,
+    required this.onTap,
+    required this.onToggle,
+    required this.onCopy,
+    required this.onResetDate,
+    required this.onDelete,
   });
 
   @override
@@ -277,41 +358,59 @@ class _CycleCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(cycle.isActive ? Icons.play_circle_fill : Icons.circle_outlined,
-                        color: cycle.isActive ? Colors.green : Colors.grey, size: 20),
+                      Icon(
+                          cycle.isActive
+                              ? Icons.play_circle_fill
+                              : Icons.circle_outlined,
+                          color: cycle.isActive ? Colors.green : Colors.grey,
+                          size: 20),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(cycle.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))),
+                      Expanded(
+                          child: Text(cycle.name,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 16))),
                       if (cycle.isActive)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.green.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text('激活中', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green)),
+                          child: const Text('激活中',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green)),
                         ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today, size: 14, color: Colors.grey[500]),
+                      Icon(Icons.calendar_today,
+                          size: 14, color: Colors.grey[500]),
                       const SizedBox(width: 4),
                       Text('${cycle.cycleLength}天循环',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13)),
                       if (cycle.startDate != null) ...[
                         const SizedBox(width: 12),
-                        Icon(Icons.play_arrow, size: 14, color: Colors.grey[500]),
+                        Icon(Icons.play_arrow,
+                            size: 14, color: Colors.grey[500]),
                         const SizedBox(width: 4),
                         Text('始于 ${cycle.startDate}',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 13)),
                       ],
-                      if (cycle.daysActive != null && cycle.daysActive! > 0) ...[
+                      if (cycle.daysActive != null &&
+                          cycle.daysActive! > 0) ...[
                         const SizedBox(width: 12),
                         Icon(Icons.loop, size: 14, color: Colors.grey[500]),
                         const SizedBox(width: 4),
                         Text('${cycle.daysActive}天前',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 13)),
                       ],
                     ],
                   ),
@@ -330,10 +429,14 @@ class _CycleCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('循环进度', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                      Text('循环进度',
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[400])),
                       Text('${(progress * 100).toStringAsFixed(0)}%',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.primary)),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary)),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -381,7 +484,9 @@ class _CycleCard extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          d.label.length > 3 ? d.label.substring(0, 3) : d.label,
+                          d.label.length > 3
+                              ? d.label.substring(0, 3)
+                              : d.label,
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
@@ -407,29 +512,41 @@ class _CycleCard extends StatelessWidget {
               children: [
                 TextButton.icon(
                   onPressed: onToggle,
-                  icon: Icon(cycle.isActive ? Icons.pause : Icons.play_arrow, size: 16),
-                  label: Text(cycle.isActive ? '停用' : '激活', style: TextStyle(fontSize: 12)),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: Icon(cycle.isActive ? Icons.pause : Icons.play_arrow,
+                      size: 16),
+                  label: Text(cycle.isActive ? '停用' : '激活',
+                      style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
                 TextButton.icon(
                   onPressed: onCopy,
                   icon: Icon(Icons.copy, size: 16, color: Colors.grey[600]),
-                  label: Text('复制', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  label: Text('复制',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
                 if (cycle.startDate != null)
                   TextButton.icon(
                     onPressed: onResetDate,
-                    icon: Icon(Icons.refresh, size: 16, color: Colors.grey[600]),
-                    label: Text('重置', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                    icon:
+                        Icon(Icons.refresh, size: 16, color: Colors.grey[600]),
+                    label: Text('重置',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8)),
                   ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                  label: const Text('删除', style: TextStyle(fontSize: 12, color: Colors.red)),
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: const Icon(Icons.delete_outline,
+                      size: 16, color: Colors.red),
+                  label: const Text('删除',
+                      style: TextStyle(fontSize: 12, color: Colors.red)),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
                 ),
               ],
             ),
@@ -448,7 +565,9 @@ class _CycleEditor extends StatefulWidget {
   final ValueChanged<TrainingCycle> onSave;
 
   const _CycleEditor({
-    required this.cycle, required this.templates, required this.onSave,
+    required this.cycle,
+    required this.templates,
+    required this.onSave,
   });
 
   @override
@@ -503,7 +622,7 @@ class _CycleEditorState extends State<_CycleEditor> {
               SwitchListTile(
                 title: const Text('休息日'),
                 subtitle: Text(isRestDay ? '这天不用训练' : '训练日',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                 value: isRestDay,
                 activeColor: Colors.orange,
                 onChanged: (v) => setDialogState(() => isRestDay = v),
@@ -512,23 +631,29 @@ class _CycleEditorState extends State<_CycleEditor> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-            FilledButton(onPressed: () {
-              setState(() {
-                _cycle = _cycle.copyWith(days: _cycle.days.map((d) {
-                  if (d.dayIndex == day.dayIndex) {
-                    return CycleDay(
-                      dayIndex: d.dayIndex,
-                      label: labelCtrl.text.trim().isEmpty ? d.label : labelCtrl.text.trim(),
-                      isRestDay: isRestDay,
-                      mealTemplateId: d.mealTemplateId,
-                    );
-                  }
-                  return d;
-                }).toList());
-              });
-              Navigator.pop(ctx);
-            }, child: const Text('确定')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+            FilledButton(
+                onPressed: () {
+                  setState(() {
+                    _cycle = _cycle.copyWith(
+                        days: _cycle.days.map((d) {
+                      if (d.dayIndex == day.dayIndex) {
+                        return CycleDay(
+                          dayIndex: d.dayIndex,
+                          label: labelCtrl.text.trim().isEmpty
+                              ? d.label
+                              : labelCtrl.text.trim(),
+                          isRestDay: isRestDay,
+                          mealTemplateId: d.mealTemplateId,
+                        );
+                      }
+                      return d;
+                    }).toList());
+                  });
+                  Navigator.pop(ctx);
+                },
+                child: const Text('确定')),
           ],
         ),
       ),
@@ -545,10 +670,13 @@ class _CycleEditorState extends State<_CycleEditor> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('第${day.dayIndex + 1}天: ${day.label} — 选择配餐',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
             const SizedBox(height: 16),
             if (widget.templates.isEmpty)
-              const Center(child: Text('还没有配餐模板，先去配餐页面保存吧', style: TextStyle(color: Colors.grey)))
+              const Center(
+                  child: Text('还没有配餐模板，先去配餐页面保存吧',
+                      style: TextStyle(color: Colors.grey)))
             else ...[
               RadioListTile<String?>(
                 title: const Text('不分配'),
@@ -556,7 +684,8 @@ class _CycleEditorState extends State<_CycleEditor> {
                 groupValue: day.mealTemplateId,
                 onChanged: (val) {
                   setState(() {
-                    _cycle = _cycle.copyWith(days: _cycle.days.map((d) {
+                    _cycle = _cycle.copyWith(
+                        days: _cycle.days.map((d) {
                       if (d.dayIndex == day.dayIndex) {
                         return d.copyWith(mealTemplateId: null);
                       }
@@ -567,22 +696,24 @@ class _CycleEditorState extends State<_CycleEditor> {
                 },
               ),
               ...widget.templates.map((t) => RadioListTile<String>(
-                title: Text(t.name),
-                subtitle: Text('目标 ${t.target.protein.toStringAsFixed(0)}P / ${t.target.carbs.toStringAsFixed(0)}C'),
-                value: t.id,
-                groupValue: day.mealTemplateId,
-                onChanged: (val) {
-                  setState(() {
-                    _cycle = _cycle.copyWith(days: _cycle.days.map((d) {
-                      if (d.dayIndex == day.dayIndex) {
-                        return d.copyWith(mealTemplateId: val);
-                      }
-                      return d;
-                    }).toList());
-                  });
-                  Navigator.pop(ctx);
-                },
-              )),
+                    title: Text(t.name),
+                    subtitle: Text(
+                        '目标 ${t.target.protein.toStringAsFixed(0)}P / ${t.target.carbs.toStringAsFixed(0)}C'),
+                    value: t.id,
+                    groupValue: day.mealTemplateId,
+                    onChanged: (val) {
+                      setState(() {
+                        _cycle = _cycle.copyWith(
+                            days: _cycle.days.map((d) {
+                          if (d.dayIndex == day.dayIndex) {
+                            return d.copyWith(mealTemplateId: val);
+                          }
+                          return d;
+                        }).toList());
+                      });
+                      Navigator.pop(ctx);
+                    },
+                  )),
             ],
           ],
         ),
@@ -595,12 +726,14 @@ class _CycleEditorState extends State<_CycleEditor> {
       if (newIndex > oldIndex) newIndex -= 1;
       final updated = List<CycleDay>.from(_cycle.days);
       final item = updated.removeAt(oldIndex);
-      updated.insert(newIndex, CycleDay(
-        dayIndex: newIndex,
-        label: item.label,
-        isRestDay: item.isRestDay,
-        mealTemplateId: item.mealTemplateId,
-      ));
+      updated.insert(
+          newIndex,
+          CycleDay(
+            dayIndex: newIndex,
+            label: item.label,
+            isRestDay: item.isRestDay,
+            mealTemplateId: item.mealTemplateId,
+          ));
       updated.asMap().forEach((i, d) {
         updated[i] = CycleDay(
           dayIndex: i,
@@ -648,11 +781,18 @@ class _CycleEditorState extends State<_CycleEditor> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  _statChip(Icons.calendar_view_day, '${_cycle.cycleLength}天循环', theme),
+                  _statChip(Icons.calendar_view_day, '${_cycle.cycleLength}天循环',
+                      theme),
                   const SizedBox(width: 12),
-                  _statChip(Icons.restaurant, '${_cycle.days.where((d) => d.mealTemplateId != null).length}天已分配', theme),
+                  _statChip(
+                      Icons.restaurant,
+                      '${_cycle.days.where((d) => d.mealTemplateId != null).length}天已分配',
+                      theme),
                   const SizedBox(width: 12),
-                  _statChip(Icons.bedtime, '${_cycle.days.where((d) => d.isRestDay).length}休息日', theme),
+                  _statChip(
+                      Icons.bedtime,
+                      '${_cycle.days.where((d) => d.isRestDay).length}休息日',
+                      theme),
                 ],
               ),
             ),
@@ -661,14 +801,17 @@ class _CycleEditorState extends State<_CycleEditor> {
 
           Row(
             children: [
-              Text('循环日编辑', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text('循环日编辑',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text('长按拖拽排序', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              Text('长按拖拽排序',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12)),
             ],
           ),
           const SizedBox(height: 4),
           Text('点击修改标签/休息日 · 右侧选择配餐模板',
-            style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+              style: TextStyle(color: Colors.grey[400], fontSize: 13)),
           const SizedBox(height: 8),
 
           // Reorderable day list
@@ -685,14 +828,18 @@ class _CycleEditorState extends State<_CycleEditor> {
             itemBuilder: (context, index) {
               final day = _cycle.days[index];
               final templateName = day.mealTemplateId != null
-                  ? widget.templates.where((t) => t.id == day.mealTemplateId).firstOrNull?.name
+                  ? widget.templates
+                      .where((t) => t.id == day.mealTemplateId)
+                      .firstOrNull
+                      ?.name
                   : null;
 
               return Card(
                 key: ValueKey('day_${day.dayIndex}_${day.mealTemplateId}'),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   leading: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -707,25 +854,35 @@ class _CycleEditorState extends State<_CycleEditor> {
                             ? Colors.orange.withValues(alpha: 0.15)
                             : theme.colorScheme.primaryContainer,
                         child: Text('${day.dayIndex + 1}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13,
-                            color: day.isRestDay ? Colors.orange : theme.colorScheme.primary,
-                          )),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: day.isRestDay
+                                  ? Colors.orange
+                                  : theme.colorScheme.primary,
+                            )),
                       ),
                     ],
                   ),
                   title: Row(
                     children: [
-                      Text(day.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(day.label,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       if (day.isRestDay) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
                           decoration: BoxDecoration(
                             color: Colors.orange.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text('休', style: TextStyle(fontSize: 10, color: Colors.orange[700], fontWeight: FontWeight.w700)),
+                          child: Text('休',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.orange[700],
+                                  fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ],
@@ -733,7 +890,9 @@ class _CycleEditorState extends State<_CycleEditor> {
                   subtitle: Text(
                     templateName ?? '未分配配餐',
                     style: TextStyle(
-                      color: templateName != null ? Colors.grey[400] : Colors.grey[600],
+                      color: templateName != null
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
                       fontSize: 13,
                     ),
                   ),
@@ -742,24 +901,31 @@ class _CycleEditorState extends State<_CycleEditor> {
                     children: [
                       if (day.mealTemplateId != null)
                         IconButton(
-                          icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                          icon: const Icon(Icons.clear,
+                              size: 18, color: Colors.red),
                           onPressed: () {
                             setState(() {
-                              _cycle = _cycle.copyWith(days: _cycle.days.map((d) {
-                                if (d.dayIndex == day.dayIndex) return d.copyWith(mealTemplateId: null);
+                              _cycle = _cycle.copyWith(
+                                  days: _cycle.days.map((d) {
+                                if (d.dayIndex == day.dayIndex)
+                                  return d.copyWith(mealTemplateId: null);
                                 return d;
                               }).toList());
                             });
                           },
                         ),
                       IconButton(
-                        icon: Icon(Icons.edit_note, size: 22, color: Colors.grey[500]),
+                        icon: Icon(Icons.edit_note,
+                            size: 22, color: Colors.grey[500]),
                         onPressed: () => _editDay(context, day),
                         tooltip: '编辑日标签',
                       ),
                       IconButton(
-                        icon: Icon(Icons.restaurant_menu, size: 20,
-                          color: day.mealTemplateId != null ? theme.colorScheme.primary : Colors.grey),
+                        icon: Icon(Icons.restaurant_menu,
+                            size: 20,
+                            color: day.mealTemplateId != null
+                                ? theme.colorScheme.primary
+                                : Colors.grey),
                         onPressed: () => _pickTemplate(context, day),
                         tooltip: '分配配餐',
                       ),
@@ -806,8 +972,9 @@ class _CycleEditorState extends State<_CycleEditor> {
           children: [
             Icon(icon, size: 16, color: theme.colorScheme.primary),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-              textAlign: TextAlign.center),
+            Text(label,
+                style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                textAlign: TextAlign.center),
           ],
         ),
       ),

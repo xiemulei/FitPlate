@@ -1,5 +1,68 @@
 enum Gender { male, female }
+
 enum FitnessGoal { fatLoss, muscleGain }
+
+enum TrainingTime {
+  afterEarlyBreakfast,
+  afterLateBreakfast,
+  beforeLunch,
+  afterLunch,
+  afterDinner,
+  night,
+}
+
+extension TrainingTimeX on TrainingTime {
+  String get label {
+    switch (this) {
+      case TrainingTime.afterEarlyBreakfast:
+        return '早饭后练（早起版）';
+      case TrainingTime.afterLateBreakfast:
+        return '早饭后练（晚起版）';
+      case TrainingTime.beforeLunch:
+        return '午饭前练';
+      case TrainingTime.afterLunch:
+        return '午饭后练';
+      case TrainingTime.afterDinner:
+        return '晚饭后练';
+      case TrainingTime.night:
+        return '夜里练';
+    }
+  }
+
+  String get icon {
+    switch (this) {
+      case TrainingTime.afterEarlyBreakfast:
+        return '🔆';
+      case TrainingTime.afterLateBreakfast:
+        return '🌤️';
+      case TrainingTime.beforeLunch:
+        return '☀️';
+      case TrainingTime.afterLunch:
+        return '🌆';
+      case TrainingTime.afterDinner:
+        return '🌇';
+      case TrainingTime.night:
+        return '🌙';
+    }
+  }
+
+  String get dietDescription {
+    switch (this) {
+      case TrainingTime.afterEarlyBreakfast:
+        return '起床→早餐→训练，练后补蛋白';
+      case TrainingTime.afterLateBreakfast:
+        return '晚起吃早餐，午餐前练完，午餐补碳蛋';
+      case TrainingTime.beforeLunch:
+        return '空腹或练前加餐→训练→午餐补碳蛋';
+      case TrainingTime.afterLunch:
+        return '午餐消化→训练→晚餐补充';
+      case TrainingTime.afterDinner:
+        return '晚餐→训练→练后加蛋白';
+      case TrainingTime.night:
+        return '晚餐→晚练→睡前补充';
+    }
+  }
+}
 
 /// 每千克摄入参考数据行
 class MacroReferenceRow {
@@ -8,7 +71,8 @@ class MacroReferenceRow {
   final String carbRange;
   final String note;
 
-  const MacroReferenceRow(this.intensity, this.proteinRange, this.carbRange, this.note);
+  const MacroReferenceRow(
+      this.intensity, this.proteinRange, this.carbRange, this.note);
 
   static const fatLossTable = [
     MacroReferenceRow('保守', '1.6–1.8', '1.5–2.0', '适合刚开始减脂，训练强度中等'),
@@ -32,6 +96,8 @@ class UserProfile {
   int age;
   Gender gender;
   FitnessGoal goal;
+  TrainingTime trainingTime;
+  bool noStrengthTraining;
 
   // 可自定义的每千克摄入量
   double proteinPerKg;
@@ -43,6 +109,8 @@ class UserProfile {
     this.age = 25,
     this.gender = Gender.male,
     this.goal = FitnessGoal.fatLoss,
+    this.trainingTime = TrainingTime.afterLunch,
+    this.noStrengthTraining = false,
     double? proteinPerKg,
     double? carbsPerKg,
   })  : proteinPerKg = proteinPerKg ?? defaultProteinPerKg(goal),
@@ -64,12 +132,16 @@ class UserProfile {
   double get dailyCarbs => weight * carbsPerKg;
   double get dailyCalories => dailyProtein * 4 + dailyCarbs * 4;
 
+  bool get showNoStrengthOption => goal == FitnessGoal.fatLoss;
+
   UserProfile copy() => UserProfile(
         height: height,
         weight: weight,
         age: age,
         gender: gender,
         goal: goal,
+        trainingTime: trainingTime,
+        noStrengthTraining: noStrengthTraining,
         proteinPerKg: proteinPerKg,
         carbsPerKg: carbsPerKg,
       );
@@ -80,6 +152,8 @@ class UserProfile {
         'age': age,
         'gender': gender == Gender.male ? 'male' : 'female',
         'goal': goal == FitnessGoal.fatLoss ? 'fatLoss' : 'muscleGain',
+        'trainingTime': trainingTime.name,
+        'noStrengthTraining': noStrengthTraining,
         'proteinPerKg': proteinPerKg,
         'carbsPerKg': carbsPerKg,
       };
@@ -89,7 +163,14 @@ class UserProfile {
         weight: (j['weight'] as num?)?.toDouble() ?? 70,
         age: (j['age'] as num?)?.toInt() ?? 25,
         gender: j['gender'] == 'female' ? Gender.female : Gender.male,
-        goal: j['goal'] == 'muscleGain' ? FitnessGoal.muscleGain : FitnessGoal.fatLoss,
+        goal: j['goal'] == 'muscleGain'
+            ? FitnessGoal.muscleGain
+            : FitnessGoal.fatLoss,
+        trainingTime: TrainingTime.values.firstWhere(
+          (t) => t.name == j['trainingTime'],
+          orElse: () => TrainingTime.afterLunch,
+        ),
+        noStrengthTraining: (j['noStrengthTraining'] as bool?) ?? false,
         proteinPerKg: (j['proteinPerKg'] as num?)?.toDouble(),
         carbsPerKg: (j['carbsPerKg'] as num?)?.toDouble(),
       );

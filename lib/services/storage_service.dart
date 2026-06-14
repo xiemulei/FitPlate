@@ -27,12 +27,15 @@ class StorageService {
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => MealTemplate.fromJson(j)).toList();
-    } catch (_) { return []; }
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveTemplates(List<MealTemplate> templates) async {
     final f = await _path('templates.json');
-    await File(f).writeAsString(jsonEncode(templates.map((t) => t.toJson()).toList()));
+    await File(f)
+        .writeAsString(jsonEncode(templates.map((t) => t.toJson()).toList()));
   }
 
   // Save/Load plans
@@ -43,14 +46,16 @@ class StorageService {
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => WeeklyPlan.fromJson(j)).toList();
-    } catch (_) { return []; }
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> savePlans(List<WeeklyPlan> plans) async {
     final f = await _path('plans.json');
-    await File(f).writeAsString(jsonEncode(plans.map((p) => p.toJson()).toList()));
+    await File(f)
+        .writeAsString(jsonEncode(plans.map((p) => p.toJson()).toList()));
   }
-
 
   // Save/Load profile
   static Future<UserProfile> loadProfile() async {
@@ -59,14 +64,15 @@ class StorageService {
       if (!await File(f).exists()) return UserProfile();
       final s = await File(f).readAsString();
       return UserProfile.fromJson(jsonDecode(s));
-    } catch (_) { return UserProfile(); }
+    } catch (_) {
+      return UserProfile();
+    }
   }
 
   static Future<void> saveProfile(UserProfile profile) async {
     final f = await _path('profile.json');
     await File(f).writeAsString(jsonEncode(profile.toJson()));
   }
-
 
   // Save/Load cycles
   static Future<List<TrainingCycle>> loadCycles() async {
@@ -76,11 +82,14 @@ class StorageService {
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => TrainingCycle.fromJson(j)).toList();
-    } catch (_) { return []; }
+    } catch (_) {
+      return [];
+    }
   }
 
   static Future<void> saveCycles(List<TrainingCycle> cycles) async {
     final f = await _path('cycles.json');
-    await File(f).writeAsString(jsonEncode(cycles.map((c) => c.toJson()).toList()));
+    await File(f)
+        .writeAsString(jsonEncode(cycles.map((c) => c.toJson()).toList()));
   }
 }

@@ -35,8 +35,10 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   @override
   void initState() {
     super.initState();
-    _pCtrl = TextEditingController(text: widget.target.protein.toStringAsFixed(1));
-    _cCtrl = TextEditingController(text: widget.target.carbs.toStringAsFixed(1));
+    _pCtrl =
+        TextEditingController(text: widget.target.protein.toStringAsFixed(1));
+    _cCtrl =
+        TextEditingController(text: widget.target.carbs.toStringAsFixed(1));
   }
 
   void _applyMealType(MealType? type) {
@@ -45,7 +47,8 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
       if (type != null) {
         _pCtrl.text = type.defaultProtein.toStringAsFixed(1);
         _cCtrl.text = type.defaultCarbs.toStringAsFixed(1);
-        widget.onTargetChanged(MealTarget(protein: type.defaultProtein, carbs: type.defaultCarbs));
+        widget.onTargetChanged(
+            MealTarget(protein: type.defaultProtein, carbs: type.defaultCarbs));
       }
     });
   }
@@ -62,27 +65,26 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
       final updated = [...widget.selected]..removeAt(idx);
       widget.onSelectedChanged(updated);
     } else {
-      widget.onSelectedChanged([...widget.selected, SelectedFood(foodId: id, ratio: 1.0)]);
+      widget.onSelectedChanged(
+          [...widget.selected, SelectedFood(foodId: id, ratio: 1.0)]);
     }
   }
 
   void _setRatio(String id, double val) {
     final list = widget.selected.map((sf) {
-      if (sf.foodId == id) return SelectedFood(foodId: id, ratio: val.clamp(0.1, 10.0));
+      if (sf.foodId == id)
+        return SelectedFood(foodId: id, ratio: val.clamp(0.1, 10.0));
       return sf;
     }).toList();
     widget.onSelectedChanged(list);
   }
 
   Map<Food, double> _calculate() {
-    final selFoods = widget.selected.map((sf) {
-      final food = widget.foods.firstWhere((f) => f.id == sf.foodId);
-      return (food, sf.ratio);
-    }).toList();
-    final totalWp = selFoods.fold(0.0, (sum, f) => sum + f.$1.proteinPer100G / 100 * f.$2);
-    if (totalWp <= 0) return {};
-    final k = widget.target.protein / totalWp;
-    return {for (final f in selFoods) f.$1: f.$2 * k};
+    return MealCalculator.calculate(
+      target: widget.target,
+      allFoods: widget.foods,
+      selected: widget.selected,
+    );
   }
 
   void _saveTemplate() {
@@ -90,7 +92,9 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
     if (name.isEmpty) return;
     widget.onSaveTemplate(MealTemplate(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name, target: widget.target, selections: widget.selected,
+      name: name,
+      target: widget.target,
+      selections: widget.selected,
     ));
     _nameCtrl.clear();
     setState(() => _showResults = false);
@@ -113,7 +117,8 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         // Meal type chips
-        Text('选择餐次', style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
+        Text('选择餐次',
+            style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
         const SizedBox(height: 8),
         SizedBox(
           height: 44,
@@ -125,9 +130,11 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
               final mt = mealTypes[i];
               final selected = _selectedType?.name == mt.name;
               return ChoiceChip(
-                label: Text('${mt.name}\n${mt.defaultProtein.toStringAsFixed(0)}P/${mt.defaultCarbs.toStringAsFixed(0)}C',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                label: Text(
+                    '${mt.name}\n${mt.defaultProtein.toStringAsFixed(0)}P/${mt.defaultCarbs.toStringAsFixed(0)}C',
+                    textAlign: TextAlign.center,
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 selected: selected,
                 onSelected: (val) => _applyMealType(val ? mt : null),
               );
@@ -137,60 +144,150 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
         const SizedBox(height: 16),
 
         // Target input
-        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('营养目标', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-          if (_selectedType != null) Padding(padding: const EdgeInsets.only(top: 4),
-            child: Text(_selectedType!.name, style: TextStyle(color: Colors.grey[400], fontSize: 13))),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: TextField(controller: _pCtrl,
-              decoration: const InputDecoration(labelText: '蛋白质 (g)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.fitness_center, size: 20)),
-              keyboardType: TextInputType.number, onEditingComplete: _updateTarget)),
-            const SizedBox(width: 12),
-            Expanded(child: TextField(controller: _cCtrl,
-              decoration: const InputDecoration(labelText: '碳水 (g)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.grain, size: 20)),
-              keyboardType: TextInputType.number, onEditingComplete: _updateTarget)),
-          ]),
-        ]))),
+        Card(
+            child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('营养目标',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      if (_selectedType != null)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(_selectedType!.name,
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 13))),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                            child: TextField(
+                                controller: _pCtrl,
+                                decoration: const InputDecoration(
+                                    labelText: '蛋白质 (g)',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon:
+                                        Icon(Icons.fitness_center, size: 20)),
+                                keyboardType: TextInputType.number,
+                                onEditingComplete: _updateTarget)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: TextField(
+                                controller: _cCtrl,
+                                decoration: const InputDecoration(
+                                    labelText: '碳水 (g)',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.grain, size: 20)),
+                                keyboardType: TextInputType.number,
+                                onEditingComplete: _updateTarget)),
+                      ]),
+                    ]))),
         const SizedBox(height: 8),
 
         // Food selection
-        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('选择食物', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text('点击选择，拖动滑块调整比例', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-          const SizedBox(height: 8),
-          if (widget.foods.isEmpty)
-            Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('还没有食物，先去食物库添加吧', style: TextStyle(color: Colors.grey[500]))))
-          else
-            ...widget.foods.map((food) {
-              final isSel = widget.selected.any((sf) => sf.foodId == food.id);
-              final ratio = widget.selected.where((sf) => sf.foodId == food.id).firstOrNull?.ratio ?? 1.0;
-              return Card(
-                color: isSel ? theme.colorScheme.primaryContainer : null,
-                margin: const EdgeInsets.only(bottom: 4),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                  leading: CircleAvatar(radius: 18,
-                    backgroundColor: isSel ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
-                    child: Text(food.name.isNotEmpty ? food.name[0] : '?',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14,
-                        color: isSel ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant))),
-                  title: Text(food.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: Text('蛋白 ${food.proteinPer100G.toStringAsFixed(1)} g/100g | 碳水 ${food.carbsPer100G.toStringAsFixed(1)} g/100g',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                  trailing: isSel
-                      ? SizedBox(width: 140, child: Row(children: [
-                          IconButton(icon: const Icon(Icons.close, size: 18), color: Colors.red, onPressed: () => _toggleFood(food.id)),
-                          Text('${ratio.toStringAsFixed(1)}x', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                          Expanded(child: Slider(value: ratio, min: 0.1, max: 5.0, divisions: 49, onChanged: (v) => _setRatio(food.id, v))),
-                        ]))
-                      : TextButton.icon(onPressed: () => _toggleFood(food.id), icon: const Icon(Icons.add, size: 18), label: const Text('选', style: TextStyle(fontSize: 13))),
-                  onTap: () => _toggleFood(food.id),
-                ),
-              );
-            }),
-        ]))),
+        Card(
+            child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('选择食物',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text('点击选择，拖动滑块调整比例',
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 13)),
+                      const SizedBox(height: 8),
+                      if (widget.foods.isEmpty)
+                        Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Center(
+                                child: Text('还没有食物，先去食物库添加吧',
+                                    style: TextStyle(color: Colors.grey[500]))))
+                      else
+                        ...widget.foods.map((food) {
+                          final isSel =
+                              widget.selected.any((sf) => sf.foodId == food.id);
+                          final ratio = widget.selected
+                                  .where((sf) => sf.foodId == food.id)
+                                  .firstOrNull
+                                  ?.ratio ??
+                              1.0;
+                          return Card(
+                            color: isSel
+                                ? theme.colorScheme.primaryContainer
+                                : null,
+                            margin: const EdgeInsets.only(bottom: 4),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 2),
+                              leading: CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: isSel
+                                      ? theme.colorScheme.primary
+                                      : theme
+                                          .colorScheme.surfaceContainerHighest,
+                                  child: Text(
+                                      food.name.isNotEmpty ? food.name[0] : '?',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          color: isSel
+                                              ? theme.colorScheme.onPrimary
+                                              : theme.colorScheme
+                                                  .onSurfaceVariant))),
+                              title: Row(
+                                children: [
+                                  Text(food.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14)),
+                                  const SizedBox(width: 4),
+                                  Text('(${food.unitLabel})',
+                                      style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 11)),
+                                ],
+                              ),
+                              subtitle: Text(
+                                  '蛋白 ${food.proteinPer100G.toStringAsFixed(1)} g/100g | 碳水 ${food.carbsPer100G.toStringAsFixed(1)} g/100g',
+                                  style: TextStyle(
+                                      color: Colors.grey[500], fontSize: 12)),
+                              trailing: isSel
+                                  ? SizedBox(
+                                      width: 140,
+                                      child: Row(children: [
+                                        IconButton(
+                                            icon: const Icon(Icons.close,
+                                                size: 18),
+                                            color: Colors.red,
+                                            onPressed: () =>
+                                                _toggleFood(food.id)),
+                                        Text('${ratio.toStringAsFixed(1)}x',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 13)),
+                                        Expanded(
+                                            child: Slider(
+                                                value: ratio,
+                                                min: 0.1,
+                                                max: 5.0,
+                                                divisions: 49,
+                                                onChanged: (v) =>
+                                                    _setRatio(food.id, v))),
+                                      ]))
+                                  : TextButton.icon(
+                                      onPressed: () => _toggleFood(food.id),
+                                      icon: const Icon(Icons.add, size: 18),
+                                      label: const Text('选',
+                                          style: TextStyle(fontSize: 13))),
+                              onTap: () => _toggleFood(food.id),
+                            ),
+                          );
+                        }),
+                    ]))),
         const SizedBox(height: 8),
 
         // Calculate button
@@ -200,7 +297,8 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
               : null,
           icon: Icon(_showResults ? Icons.refresh : Icons.calculate),
           label: Text(_showResults ? '重新计算' : '计算结果'),
-          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14)),
         ),
 
         // Results
@@ -212,50 +310,108 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   List<Widget> _buildResults(ThemeData theme) {
     final results = _calculate();
     if (results.isEmpty) {
-      return [const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: Text('请先选择食物'))))];
+      return [
+        const Card(
+            child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: Text('请先选择食物'))))
+      ];
     }
 
-    final actualP = results.entries.fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
-    final actualC = results.entries.fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
+    final actualP = results.entries
+        .fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
+    final actualC = results.entries
+        .fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
 
     return [
       Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text('计算结果', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+              Text('计算结果',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
-              Text('${results.values.fold(0.0, (s, v) => s + v).toStringAsFixed(0)}g',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
+              Text(
+                  '${results.values.fold(0.0, (s, v) => s + v).toStringAsFixed(0)}g',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.primary)),
             ]),
             const Divider(),
-            ...results.entries.map((e) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(e.key.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('蛋白 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g · 碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-                ]),
-                Text('${e.value.toStringAsFixed(0)}g', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
-              ],
-            ))),
+            ...results.entries.map((e) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(e.key.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 4),
+                              Text('(${e.key.unitLabel})',
+                                  style: TextStyle(
+                                      color: Colors.grey[500], fontSize: 11)),
+                            ],
+                          ),
+                          Text(
+                              '蛋白 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g · 碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g',
+                              style: TextStyle(
+                                  color: Colors.grey[400], fontSize: 12)),
+                        ]),
+                    Text(
+                      FoodAmountFormatter.formatAmount(e.key, e.value),
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.primary),
+                    ),
+                  ],
+                ))),
             const Divider(),
             Row(children: [
-              Expanded(child: Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                child: Column(children: [
-                  Text('${actualP.toStringAsFixed(1)}g', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.orange)),
-                  Text('蛋白质 · 目标 ${widget.target.protein.toStringAsFixed(1)}g', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                ]))),
+              Expanded(
+                  child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Column(children: [
+                        Text('${actualP.toStringAsFixed(1)}g',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.orange)),
+                        Text(
+                            '蛋白质 · 目标 ${widget.target.protein.toStringAsFixed(1)}g',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 11)),
+                      ]))),
               const SizedBox(width: 8),
-              Expanded(child: Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                child: Column(children: [
-                  Text('${actualC.toStringAsFixed(1)}g', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.green)),
-                  Text('碳水 · 目标 ${widget.target.carbs.toStringAsFixed(1)}g', style: TextStyle(color: Colors.grey[400], fontSize: 11)),
-                ]))),
+              Expanded(
+                  child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8)),
+                      child: Column(children: [
+                        Text('${actualC.toStringAsFixed(1)}g',
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.green)),
+                        Text(
+                            '碳水 · 目标 ${widget.target.carbs.toStringAsFixed(1)}g',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 11)),
+                      ]))),
             ]),
             const SizedBox(height: 12),
             FilledButton.tonalIcon(
@@ -263,12 +419,22 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text('保存配餐模板'),
-                  content: TextField(controller: _nameCtrl,
-                    decoration: const InputDecoration(hintText: '模板名称（如：减脂午餐）', border: OutlineInputBorder()),
-                    autofocus: true),
+                  content: TextField(
+                      controller: _nameCtrl,
+                      decoration: const InputDecoration(
+                          hintText: '模板名称（如：减脂午餐）',
+                          border: OutlineInputBorder()),
+                      autofocus: true),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-                    FilledButton(onPressed: () { _saveTemplate(); Navigator.pop(ctx); }, child: const Text('保存')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('取消')),
+                    FilledButton(
+                        onPressed: () {
+                          _saveTemplate();
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('保存')),
                   ],
                 ),
               ),

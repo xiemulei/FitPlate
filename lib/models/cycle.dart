@@ -1,5 +1,6 @@
-import '../models/food.dart';
+import '../models/user_profile.dart';
 
+/// 训练循环模型
 class CycleDay {
   int dayIndex;
   String label;
@@ -28,18 +29,18 @@ class CycleDay {
   }
 
   Map<String, dynamic> toJson() => {
-    'dayIndex': dayIndex,
-    'label': label,
-    'isRestDay': isRestDay,
-    'mealTemplateId': mealTemplateId,
-  };
+        'dayIndex': dayIndex,
+        'label': label,
+        'isRestDay': isRestDay,
+        'mealTemplateId': mealTemplateId,
+      };
 
   factory CycleDay.fromJson(Map<String, dynamic> j) => CycleDay(
-    dayIndex: j['dayIndex'],
-    label: j['label'],
-    isRestDay: j['isRestDay'] ?? false,
-    mealTemplateId: j['mealTemplateId'],
-  );
+        dayIndex: j['dayIndex'],
+        label: j['label'],
+        isRestDay: j['isRestDay'] ?? false,
+        mealTemplateId: j['mealTemplateId'],
+      );
 }
 
 class TrainingCycle {
@@ -49,6 +50,7 @@ class TrainingCycle {
   List<CycleDay> days;
   String? startDate;
   bool isActive;
+  TrainingTime? trainingTime; // 覆盖 UserProfile 中的训练时间设置
 
   TrainingCycle({
     required this.id,
@@ -57,6 +59,7 @@ class TrainingCycle {
     required this.days,
     this.startDate,
     this.isActive = false,
+    this.trainingTime,
   });
 
   TrainingCycle copyWith({
@@ -66,6 +69,7 @@ class TrainingCycle {
     List<CycleDay>? days,
     String? startDate,
     bool? isActive,
+    TrainingTime? trainingTime,
   }) {
     return TrainingCycle(
       id: id ?? this.id,
@@ -74,6 +78,7 @@ class TrainingCycle {
       days: days ?? this.days,
       startDate: startDate ?? this.startDate,
       isActive: isActive ?? this.isActive,
+      trainingTime: trainingTime ?? this.trainingTime,
     );
   }
 
@@ -109,20 +114,27 @@ class TrainingCycle {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'cycleLength': cycleLength,
-    'days': days.map((d) => d.toJson()).toList(),
-    'startDate': startDate,
-    'isActive': isActive,
-  };
+        'id': id,
+        'name': name,
+        'cycleLength': cycleLength,
+        'days': days.map((d) => d.toJson()).toList(),
+        'startDate': startDate,
+        'isActive': isActive,
+        'trainingTime': trainingTime?.name,
+      };
 
   factory TrainingCycle.fromJson(Map<String, dynamic> j) => TrainingCycle(
-    id: j['id'],
-    name: j['name'],
-    cycleLength: j['cycleLength'],
-    days: (j['days'] as List).map((d) => CycleDay.fromJson(d)).toList(),
-    startDate: j['startDate'],
-    isActive: j['isActive'] ?? false,
-  );
+        id: j['id'],
+        name: j['name'],
+        cycleLength: j['cycleLength'],
+        days: (j['days'] as List).map((d) => CycleDay.fromJson(d)).toList(),
+        startDate: j['startDate'],
+        isActive: j['isActive'] ?? false,
+        trainingTime: j['trainingTime'] != null
+            ? TrainingTime.values.firstWhere(
+                (t) => t.name == j['trainingTime'],
+                orElse: () => TrainingTime.afterLunch,
+              )
+            : null,
+      );
 }

@@ -422,6 +422,8 @@ class PresetFoods {
     Food(
       id: 'protein_egg_whole',
       name: '鸡蛋（全蛋）',
+      unit: FoodUnit.piece,
+      gramsPerUnit: 50,
       proteinPer100G: 13.0,
       carbsPer100G: 1.5,
       category: '蛋白质-纯瘦肉',
@@ -429,6 +431,8 @@ class PresetFoods {
     Food(
       id: 'protein_egg_white',
       name: '蛋白',
+      unit: FoodUnit.piece,
+      gramsPerUnit: 35,
       proteinPer100G: 11.0,
       carbsPer100G: 1.0,
       category: '蛋白质-纯瘦肉',

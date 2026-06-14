@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../models/cycle.dart';
+import '../models/user_profile.dart';
 
 class TodayScreen extends StatefulWidget {
   final List<TrainingCycle> cycles;
   final List<MealTemplate> templates;
   final List<Food> foods;
   final VoidCallback onGoToCycle;
+  final UserProfile? profile;
 
   const TodayScreen({
     super.key,
@@ -14,6 +16,7 @@ class TodayScreen extends StatefulWidget {
     required this.templates,
     required this.foods,
     required this.onGoToCycle,
+    this.profile,
   });
 
   @override
@@ -31,15 +34,11 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   Map<Food, double> _calculate(MealTemplate template) {
-    final selFoods = template.selections.map((sf) {
-      final food = widget.foods.firstWhere((f) => f.id == sf.foodId,
-          orElse: () => Food(id: '', name: '\u672a\u77e5', proteinPer100G: 0, carbsPer100G: 0));
-      return (food, sf.ratio);
-    }).toList();
-    final totalWp = selFoods.fold(0.0, (sum, f) => sum + f.$1.proteinPer100G / 100 * f.$2);
-    if (totalWp <= 0) return {};
-    final k = template.target.protein / totalWp;
-    return {for (final f in selFoods) f.$1: f.$2 * k};
+    return MealCalculator.calculate(
+      target: template.target,
+      allFoods: widget.foods,
+      selected: template.selections,
+    );
   }
 
   @override
@@ -54,19 +53,20 @@ class _TodayScreenState extends State<TodayScreen> {
           children: [
             Icon(Icons.today, size: 72, color: Colors.grey[600]),
             const SizedBox(height: 16),
-            Text('\u4eca\u5929\u5403\u4ec0\u4e48\uff1f',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('今天吃什么？',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text('\u8fd8\u6ca1\u6709\u6fc0\u6d3b\u7684\u8bad\u7ec3\u5faa\u73af',
-              style: TextStyle(color: Colors.grey[400], fontSize: 15)),
+            Text('还没有激活的训练循环',
+                style: TextStyle(color: Colors.grey[400], fontSize: 15)),
             const SizedBox(height: 8),
-            Text('\u5148\u521b\u5efa\u4e00\u4e2a\u5faa\u73af\uff0c\u7136\u540e\u5206\u914d\u914d\u9910\u6a21\u677f\u5427\uff01',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+            Text('先创建一个循环，然后分配配餐模板吧！',
+                style: TextStyle(color: Colors.grey[500], fontSize: 13)),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: widget.onGoToCycle,
               icon: const Icon(Icons.add),
-              label: const Text('\u521b\u5efa\u5faa\u73af'),
+              label: const Text('创建循环'),
             ),
           ],
         ),
@@ -74,7 +74,7 @@ class _TodayScreenState extends State<TodayScreen> {
     }
 
     final todayDay = active.todayDay;
-    final todayLabel = todayDay?.label ?? '\u7b2c${(active.todayIndex ?? 0) + 1}\u5929';
+    final todayLabel = todayDay?.label ?? '第${(active.todayIndex ?? 0) + 1}天';
     final template = _findTemplate(todayDay?.mealTemplateId);
 
     return ListView(
@@ -89,13 +89,15 @@ class _TodayScreenState extends State<TodayScreen> {
               child: Icon(Icons.restaurant, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 12),
-            Expanded(child: Column(
+            Expanded(
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('\u4eca\u5929\u5403\u4ec0\u4e48',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                Text('\u5faa\u73af: ${active.name} \u00b7 $todayLabel',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                Text('今天吃什么',
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                Text('循环: ${active.name} · $todayLabel',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 13)),
               ],
             )),
           ],
@@ -109,7 +111,9 @@ class _TodayScreenState extends State<TodayScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('\u5faa\u73af\u8fdb\u5ea6', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text('循环进度',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Row(
                   children: active.days.map((d) {
@@ -135,7 +139,9 @@ class _TodayScreenState extends State<TodayScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isToday ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
+                                color: isToday
+                                    ? theme.colorScheme.onPrimary
+                                    : theme.colorScheme.primary,
                               ),
                             ),
                           ),
@@ -147,23 +153,36 @@ class _TodayScreenState extends State<TodayScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(Icons.circle, size: 12, color: theme.colorScheme.primary),
+                    Icon(Icons.circle,
+                        size: 12, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
-                    Text('\u4eca\u5929', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                    Text('今天',
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[400])),
                     const SizedBox(width: 12),
-                    Container(width: 12, height: 12, decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(3),
-                    )),
+                    Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(3),
+                        )),
                     const SizedBox(width: 4),
-                    Text('\u8bad\u7ec3\u65e5', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                    Text('训练日',
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[400])),
                     const SizedBox(width: 12),
-                    Container(width: 12, height: 12, decoration: BoxDecoration(
-                      color: Colors.grey.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(3),
-                    )),
+                    Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(3),
+                        )),
                     const SizedBox(width: 4),
-                    Text('\u4f11\u606f\u65e5', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                    Text('休息日',
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[400])),
                   ],
                 ),
               ],
@@ -172,32 +191,74 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Today's meal
-        if (template != null) ..._buildMealCard(theme, template) else
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Column(
+        // Training time suggestion
+        if (widget.profile != null) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 40, color: Colors.grey[500]),
-                  const SizedBox(height: 8),
-                  Text('\u8fd9\u5929\u8fd8\u6ca1\u5206\u914d\u914d\u9910\u6a21\u677f',
-                    style: TextStyle(color: Colors.grey[400])),
-                  const SizedBox(height: 4),
-                  Text('\u53bb\u300c\u5faa\u73af\u300d\u9875\u9762\u8bbe\u7f6e',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                  Text(widget.profile!.trainingTime.icon,
+                      style: const TextStyle(fontSize: 24)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('训练时段: ${widget.profile!.trainingTime.label}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text(widget.profile!.trainingTime.dietDescription,
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 12)),
+                        if (widget.profile!.noStrengthTraining) ...[
+                          const SizedBox(height: 4),
+                          Text('纯饮食控制模式',
+                              style: TextStyle(
+                                  color: Colors.orange[300],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500)),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+        ],
+
+        // Today's meal
+        if (template != null)
+          ..._buildMealCard(theme, template)
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.info_outline, size: 40, color: Colors.grey[500]),
+                    const SizedBox(height: 8),
+                    Text('这天还没分配配餐模板',
+                        style: TextStyle(color: Colors.grey[400])),
+                    const SizedBox(height: 4),
+                    Text('去「循环」页面设置',
+                        style:
+                            TextStyle(color: Colors.grey[500], fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 16),
 
         OutlinedButton.icon(
           onPressed: widget.onGoToCycle,
           icon: const Icon(Icons.settings),
-          label: const Text('\u7ba1\u7406\u5faa\u73af'),
+          label: const Text('管理循环'),
         ),
       ],
     );
@@ -205,8 +266,10 @@ class _TodayScreenState extends State<TodayScreen> {
 
   List<Widget> _buildMealCard(ThemeData theme, MealTemplate template) {
     final results = _calculate(template);
-    final actualP = results.entries.fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
-    final actualC = results.entries.fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
+    final actualP = results.entries
+        .fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
+    final actualC = results.entries
+        .fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
 
     return [
       Card(
@@ -217,42 +280,64 @@ class _TodayScreenState extends State<TodayScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.restaurant_menu, color: theme.colorScheme.primary, size: 20),
+                  Icon(Icons.restaurant_menu,
+                      color: theme.colorScheme.primary, size: 20),
                   const SizedBox(width: 8),
-                  Text(template.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  Text(template.name,
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '\u76ee\u6807 ${template.target.protein.toStringAsFixed(0)}P / ${template.target.carbs.toStringAsFixed(0)}C',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: theme.colorScheme.primary),
+                      '目标 ${template.target.protein.toStringAsFixed(0)}P / ${template.target.carbs.toStringAsFixed(0)}C',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary),
                     ),
                   ),
                 ],
               ),
               const Divider(),
               ...results.entries.map((e) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(e.key.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    Text(
-                      '${e.value.toStringAsFixed(0)}g',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(e.key.name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500)),
+                            const SizedBox(width: 4),
+                            Text('(${e.key.unitLabel})',
+                                style: TextStyle(
+                                    color: Colors.grey[500], fontSize: 11)),
+                          ],
+                        ),
+                        Text(
+                          FoodAmountFormatter.formatAmount(e.key, e.value),
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              )),
+                  )),
               const Divider(),
               Row(
                 children: [
-                  Text('\u5b9e\u9645: ${actualP.toStringAsFixed(1)}g \u86cb\u767d\u8d28 / ${actualC.toStringAsFixed(1)}g \u78b3\u6c34',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+                  Text(
+                      '实际: ${actualP.toStringAsFixed(1)}g 蛋白质 / ${actualC.toStringAsFixed(1)}g 碳水',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary)),
                 ],
               ),
             ],
@@ -272,17 +357,21 @@ class _TodayScreenState extends State<TodayScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('\u7b2c${day.dayIndex + 1}\u5929: ${day.label}',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text('第${day.dayIndex + 1}天: ${day.label}',
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             const SizedBox(height: 8),
-            Text(day.isRestDay ? '\u4f11\u606f\u65e5' : '\u8bad\u7ec3\u65e5',
-              style: TextStyle(color: day.isRestDay ? Colors.orange : Colors.green, fontSize: 13)),
+            Text(day.isRestDay ? '休息日' : '训练日',
+                style: TextStyle(
+                    color: day.isRestDay ? Colors.orange : Colors.green,
+                    fontSize: 13)),
             if (template != null) ...[
               const SizedBox(height: 12),
-              Text('\u914d\u9910: ${template.name}', style: TextStyle(color: Colors.grey[400])),
+              Text('配餐: ${template.name}',
+                  style: TextStyle(color: Colors.grey[400])),
             ] else ...[
               const SizedBox(height: 12),
-              Text('\u672a\u5206\u914d\u914d\u9910\u6a21\u677f', style: TextStyle(color: Colors.grey[500])),
+              Text('未分配配餐模板', style: TextStyle(color: Colors.grey[500])),
             ],
           ],
         ),

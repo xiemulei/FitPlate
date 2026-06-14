@@ -24,7 +24,9 @@ class FoodLibraryScreen extends StatelessWidget {
           children: [
             Icon(Icons.kitchen_outlined, size: 80, color: Colors.grey[600]),
             const SizedBox(height: 16),
-            Text('还没有食物', style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
+            Text('还没有食物',
+                style:
+                    theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
             const SizedBox(height: 8),
             Text('点击右下角 + 添加食物', style: TextStyle(color: Colors.grey[500])),
             const SizedBox(height: 24),
@@ -90,7 +92,6 @@ class FoodLibraryScreen extends StatelessWidget {
 
   Widget _buildRow(BuildContext context, int index) {
     final item = _rowItems[index];
-    final theme = Theme.of(context);
 
     switch (item.type) {
       case _RowType.header:
@@ -105,6 +106,7 @@ class FoodLibraryScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
     final icon = _categoryIcon(title);
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 4),
@@ -154,7 +156,15 @@ class FoodLibraryScreen extends StatelessWidget {
             ),
           ),
         ),
-        title: Text(food.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Row(
+          children: [
+            Text(food.name,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            Text('(${food.unitLabel})',
+                style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+          ],
+        ),
         subtitle: Text(
           '蛋白质 ${food.proteinPer100G.toStringAsFixed(1)}  碳水 ${food.carbsPer100G.toStringAsFixed(1)}',
           style: TextStyle(color: Colors.grey[400], fontSize: 13),
@@ -174,7 +184,8 @@ class FoodLibraryScreen extends StatelessWidget {
             ),
           );
           if (result != null) {
-            final updated = foods.map((f) => f.id == food.id ? result : f).toList();
+            final updated =
+                foods.map((f) => f.id == food.id ? result : f).toList();
             onFoodsChanged(updated);
           }
         },
@@ -217,7 +228,9 @@ class FoodLibraryScreen extends StatelessWidget {
     final subs = PresetFoods.subcategoriesOf(category);
     if (subs.isNotEmpty) {
       for (final sub in subs) {
-        final subFoods = grouped[sub]?.where((f) => foods.any((ff) => ff.id == f.id)).toList();
+        final subFoods = grouped[sub]
+            ?.where((f) => foods.any((ff) => ff.id == f.id))
+            .toList();
         if (subFoods != null && subFoods.isNotEmpty) {
           result.add(MapEntry(sub, subFoods));
         }
@@ -256,7 +269,8 @@ class _RowItem {
   _RowItem._(this.type, {this.label = '', this.food});
 
   factory _RowItem.header(String l) => _RowItem._(_RowType.header, label: l);
-  factory _RowItem.subheader(String l) => _RowItem._(_RowType.subheader, label: l);
+  factory _RowItem.subheader(String l) =>
+      _RowItem._(_RowType.subheader, label: l);
   factory _RowItem.food(Food f) => _RowItem._(_RowType.food, food: f);
   factory _RowItem.divider() => _RowItem._(_RowType.divider);
 }

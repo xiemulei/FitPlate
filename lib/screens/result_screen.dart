@@ -10,25 +10,27 @@ class ResultScreen extends StatefulWidget {
   final VoidCallback onBack;
 
   const ResultScreen({
-    super.key, required this.foods, required this.target,
-    required this.selected, required this.templates,
-    required this.onSave, required this.onBack,
+    super.key,
+    required this.foods,
+    required this.target,
+    required this.selected,
+    required this.templates,
+    required this.onSave,
+    required this.onBack,
   });
-  @override State<ResultScreen> createState() => _ResultScreenState();
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
 }
 
 class _ResultScreenState extends State<ResultScreen> {
   final _nameCtrl = TextEditingController();
 
   Map<Food, double> _calculate() {
-    final selFoods = widget.selected.map((sf) {
-      final food = widget.foods.firstWhere((f) => f.id == sf.foodId);
-      return (food, sf.ratio);
-    }).toList();
-    final totalWp = selFoods.fold(0.0, (sum, f) => sum + f.$1.proteinPer100G / 100 * f.$2);
-    if (totalWp <= 0) return {};
-    final k = widget.target.protein / totalWp;
-    return {for (final f in selFoods) f.$1: f.$2 * k};
+    return MealCalculator.calculate(
+      target: widget.target,
+      allFoods: widget.foods,
+      selected: widget.selected,
+    );
   }
 
   void _saveTemplate() {
@@ -45,7 +47,10 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   @override
-  void dispose() { _nameCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +60,10 @@ class _ResultScreenState extends State<ResultScreen> {
       return const Center(child: Text('请先在配餐页面选择食物'));
     }
 
-    final actualP = results.entries.fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
-    final actualC = results.entries.fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
+    final actualP = results.entries
+        .fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
+    final actualC = results.entries
+        .fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
     final totalG = results.values.fold(0.0, (s, v) => s + v);
 
     return ListView(
@@ -68,26 +75,47 @@ class _ResultScreenState extends State<ResultScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('每份克数', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                    '每份${results.entries.first.key.unit.isItemUnit ? '（按单位换算）' : ''}',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600)),
                 const Divider(),
                 ...results.entries.map((e) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(e.key.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text('蛋白质 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g  ·  碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(e.key.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 4),
+                                  Text('(${e.key.unitLabel})',
+                                      style: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 11)),
+                                ],
+                              ),
+                              Text(
+                                  '蛋白质 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g  ·  碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g',
+                                  style: TextStyle(
+                                      color: Colors.grey[400], fontSize: 13)),
+                            ],
+                          ),
+                          Text(
+                            FoodAmountFormatter.formatAmount(e.key, e.value),
+                            style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: theme.colorScheme.primary),
+                          ),
                         ],
                       ),
-                      Text('${e.value.toStringAsFixed(0)}g', style: TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800, color: theme.colorScheme.primary)),
-                    ],
-                  ),
-                )),
+                    )),
                 const Divider(),
                 Row(
                   children: [
@@ -100,10 +128,15 @@ class _ResultScreenState extends State<ResultScreen> {
                         ),
                         child: Column(
                           children: [
-                            Text('${actualP.toStringAsFixed(1)}g', style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800, color: Colors.orange)),
-                            Text('蛋白质 · 目标 ${widget.target.protein.toStringAsFixed(1)}g',
-                              style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                            Text('${actualP.toStringAsFixed(1)}g',
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.orange)),
+                            Text(
+                                '蛋白质 · 目标 ${widget.target.protein.toStringAsFixed(1)}g',
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 12)),
                           ],
                         ),
                       ),
@@ -118,10 +151,15 @@ class _ResultScreenState extends State<ResultScreen> {
                         ),
                         child: Column(
                           children: [
-                            Text('${actualC.toStringAsFixed(1)}g', style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w800, color: Colors.green)),
-                            Text('碳水 · 目标 ${widget.target.carbs.toStringAsFixed(1)}g',
-                              style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                            Text('${actualC.toStringAsFixed(1)}g',
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.green)),
+                            Text(
+                                '碳水 · 目标 ${widget.target.carbs.toStringAsFixed(1)}g',
+                                style: TextStyle(
+                                    color: Colors.grey[400], fontSize: 12)),
                           ],
                         ),
                       ),
@@ -129,7 +167,9 @@ class _ResultScreenState extends State<ResultScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Center(child: Text('总重量: ${totalG.toStringAsFixed(0)}g', style: TextStyle(color: Colors.grey[500]))),
+                Center(
+                    child: Text('总重量: ${totalG.toStringAsFixed(0)}g',
+                        style: TextStyle(color: Colors.grey[500]))),
               ],
             ),
           ),
@@ -144,7 +184,8 @@ class _ResultScreenState extends State<ResultScreen> {
           onPressed: widget.onBack,
           icon: const Icon(Icons.arrow_back),
           label: const Text('返回调整'),
-          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14)),
         ),
       ],
     );
@@ -157,11 +198,13 @@ class _ResultScreenState extends State<ResultScreen> {
         title: const Text('保存配餐模板'),
         content: TextField(
           controller: _nameCtrl,
-          decoration: const InputDecoration(hintText: '模板名称（如：减脂午餐）', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              hintText: '模板名称（如：减脂午餐）', border: OutlineInputBorder()),
           autofocus: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           FilledButton(onPressed: _saveTemplate, child: const Text('保存')),
         ],
       ),

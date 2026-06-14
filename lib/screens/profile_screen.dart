@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../models/food.dart';
+import '../data/nutrition_reference.dart';
 import 'template_list_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -32,6 +33,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _userTweakedProtein = false;
   bool _userTweakedCarbs = false;
 
+  // 查表推荐状态
+  String? _recommendationNote;
+  (double, double)? _recommendedFactor; // ($1=carbsPerKg, $2=proteinPerKg)
+  bool _hasAppliedRecommendation = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,8 +47,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _ageCtrl = TextEditingController(text: p.age.toString());
     _proteinKgCtrl =
         TextEditingController(text: p.proteinPerKg.toStringAsFixed(1));
-    _carbsKgCtrl =
-        TextEditingController(text: p.carbsPerKg.toStringAsFixed(1));
+    _carbsKgCtrl = TextEditingController(text: p.carbsPerKg.toStringAsFixed(1));
+    // 页面恢复时自动查表推荐
+    _lookupRecommendation();
   }
 
   @override
@@ -59,7 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final h = double.tryParse(_heightCtrl.text) ?? widget.profile.height;
     final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
     final a = int.tryParse(_ageCtrl.text) ?? widget.profile.age;
-    final pk = double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
+    final pk =
+        double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
     final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
     widget.profile.height = h;
     widget.profile.weight = w;
@@ -77,18 +85,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.profile.goal = newGoal;
       // 若用户未手动调过，则自动设为目标默认值
       if (!_userTweakedProtein) {
-        widget.profile.proteinPerKg =
-            UserProfile.defaultProteinPerKg(newGoal);
-        _proteinKgCtrl.text =
-            widget.profile.proteinPerKg.toStringAsFixed(1);
+        widget.profile.proteinPerKg = UserProfile.defaultProteinPerKg(newGoal);
+        _proteinKgCtrl.text = widget.profile.proteinPerKg.toStringAsFixed(1);
       }
       if (!_userTweakedCarbs) {
-        widget.profile.carbsPerKg =
-            UserProfile.defaultCarbsPerKg(newGoal);
+        widget.profile.carbsPerKg = UserProfile.defaultCarbsPerKg(newGoal);
         _carbsKgCtrl.text = widget.profile.carbsPerKg.toStringAsFixed(1);
       }
     });
     _save();
+  }
+
+  /// 根据身高/体重/性别/目标/训练情况查表获取推荐值
+  void _lookupRecommendation() {
+    final p = widget.profile;
+    final h = double.tryParse(_heightCtrl.text) ?? p.height;
+    final w = double.tryParse(_weightCtrl.text) ?? p.weight;
+    final isStrengthTraining = !p.noStrengthTraining;
+    final result = NutritionReference.lookupRecommended(
+      isMale: p.gender == Gender.male,
+      heightCm: h.round(),
+      weightKg: w.round(),
+      isStrengthTraining: isStrengthTraining,
+      goal: p.goal,
+    );
+    if (result != null) {
+      _recommendedFactor = result;
+      _recommendationNote = NutritionReference.recommendationNote(
+        isMale: p.gender == Gender.male,
+        heightCm: h.round(),
+        weightKg: w.round(),
+        isStrengthTraining: isStrengthTraining,
+        goal: p.goal,
+      );
+      _hasAppliedRecommendation = true;
+      // 自动填入查表推荐值
+      p.proteinPerKg = result.$2;
+      p.carbsPerKg = result.$1;
+      _proteinKgCtrl.text = result.$2.toStringAsFixed(1);
+      _carbsKgCtrl.text = result.$1.toStringAsFixed(1);
+      _userTweakedProtein = false;
+      _userTweakedCarbs = false;
+    } else {
+      _recommendedFactor = null;
+      _recommendationNote = '当前身高/体重组合暂无参考数据';
+      _hasAppliedRecommendation = false;
+    }
+  }
+
+  void _applyRecommendation() {
+    if (_recommendedFactor == null) return;
+    final p = widget.profile;
+    p.proteinPerKg = _recommendedFactor!.$2;
+    p.carbsPerKg = _recommendedFactor!.$1;
+    _proteinKgCtrl.text = p.proteinPerKg.toStringAsFixed(1);
+    _carbsKgCtrl.text = p.carbsPerKg.toStringAsFixed(1);
+    _hasAppliedRecommendation = true;
+    _userTweakedProtein = false;
+    _userTweakedCarbs = false;
+    setState(() {});
   }
 
   void _showRefTable() {
@@ -143,7 +198,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius:
                           const BorderRadius.vertical(top: Radius.circular(8)),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     child: Row(children: [
                       _th('强度', flex: 1),
                       _th('蛋白质 (g/kg)', flex: 2),
@@ -216,8 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Expanded(
       flex: flex,
       child: Text(text,
-          style: const TextStyle(
-              fontWeight: FontWeight.w600, fontSize: 13)),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
     );
   }
 
@@ -280,8 +335,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 decoration: const InputDecoration(
                                     labelText: '体重 (kg)',
                                     border: OutlineInputBorder(),
-                                    prefixIcon:
-                                        Icon(Icons.monitor_weight)),
+                                    prefixIcon: Icon(Icons.monitor_weight)),
                                 keyboardType: TextInputType.number)),
                       ]),
                       const SizedBox(height: 12),
@@ -307,8 +361,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ?.copyWith(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 12),
                       Text('性别',
-                          style: TextStyle(
-                              color: Colors.grey[400], fontSize: 13)),
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13)),
                       const SizedBox(height: 8),
                       SegmentedButton<Gender>(
                         segments: const [
@@ -329,8 +383,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text('目标',
-                          style: TextStyle(
-                              color: Colors.grey[400], fontSize: 13)),
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13)),
                       const SizedBox(height: 8),
                       SegmentedButton<FitnessGoal>(
                         segments: const [
@@ -344,9 +398,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: Icon(Icons.trending_up)),
                         ],
                         selected: {p.goal},
-                        onSelectionChanged: (set) =>
-                            _onGoalChanged(set.first),
+                        onSelectionChanged: (set) => _onGoalChanged(set.first),
                       ),
+                      const SizedBox(height: 16),
+                      Text('训练时间',
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: TrainingTime.values
+                            .map((t) => ChoiceChip(
+                                  label: Text('${t.icon} ${t.label}',
+                                      style: const TextStyle(fontSize: 13)),
+                                  selected: p.trainingTime == t,
+                                  onSelected: (_) {
+                                    setState(() => p.trainingTime = t);
+                                    _save();
+                                  },
+                                ))
+                            .toList(),
+                      ),
+                      if (p.goal == FitnessGoal.fatLoss) ...[
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          title: const Text('不做力量训练（纯饮食控制）',
+                              style: TextStyle(fontSize: 14)),
+                          value: p.noStrengthTraining,
+                          onChanged: (v) {
+                            setState(() => p.noStrengthTraining = v);
+                            _lookupRecommendation();
+                            _save();
+                          },
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                      ],
                     ]))),
         const SizedBox(height: 12),
 
@@ -358,7 +446,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Icon(Icons.tune, size: 18, color: theme.colorScheme.primary),
+                        Icon(Icons.tune,
+                            size: 18, color: theme.colorScheme.primary),
                         const SizedBox(width: 8),
                         Text('每千克摄入量 (g/kg)',
                             style: theme.textTheme.titleMedium
@@ -366,20 +455,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const Spacer(),
                         TextButton.icon(
                           onPressed: _showRefTable,
-                          icon: const Icon(Icons.table_chart_outlined,
-                              size: 18),
-                          label: const Text('参考表',
-                              style: TextStyle(fontSize: 13)),
+                          icon:
+                              const Icon(Icons.table_chart_outlined, size: 18),
+                          label:
+                              const Text('参考表', style: TextStyle(fontSize: 13)),
                           style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8)),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8)),
                         ),
                       ]),
                       const SizedBox(height: 4),
                       Text(
                         '根据下面的参考表调整每千克摄入量，每日总量会自动更新',
-                        style:
-                            TextStyle(color: Colors.grey[400], fontSize: 12),
+                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
                       ),
                       const SizedBox(height: 14),
                       Row(children: [
@@ -394,11 +482,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             helperText: '调节后自动计算',
                             helperStyle: TextStyle(fontSize: 11),
                           ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(
-                                  decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           onChanged: (_) {
                             _userTweakedProtein = true;
+                            if (_hasAppliedRecommendation) {
+                              _hasAppliedRecommendation = false;
+                            }
                             setState(() {});
                           },
                         )),
@@ -414,15 +504,92 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             helperText: '调节后自动计算',
                             helperStyle: TextStyle(fontSize: 11),
                           ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(
-                                  decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
                           onChanged: (_) {
                             _userTweakedCarbs = true;
+                            if (_hasAppliedRecommendation) {
+                              _hasAppliedRecommendation = false;
+                            }
                             setState(() {});
                           },
                         )),
                       ]),
+                      // 查表推荐提示
+                      if (_recommendationNote != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.blue.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.auto_awesome,
+                                      size: 16, color: Colors.blue[600]),
+                                  const SizedBox(width: 6),
+                                  Text('查表推荐',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue[700])),
+                                  if (!_hasAppliedRecommendation) ...[
+                                    const Spacer(),
+                                    TextButton.icon(
+                                      onPressed: _applyRecommendation,
+                                      icon: const Icon(Icons.check_circle_outline,
+                                          size: 16),
+                                      label: const Text('应用推荐',
+                                          style: TextStyle(fontSize: 12)),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.check,
+                                              size: 13, color: Colors.green[700]),
+                                          const SizedBox(width: 3),
+                                          Text('已应用',
+                                              style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.green[700])),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(_recommendationNote!,
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                      ],
                     ]))),
         const SizedBox(height: 12),
 
@@ -441,14 +608,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontWeight: FontWeight.w700,
                             fontSize: 16,
                             color: theme.colorScheme.onPrimaryContainer)),
+                    const Spacer(),
+                    if (_hasAppliedRecommendation)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.auto_awesome,
+                                size: 13,
+                                color: theme.colorScheme.onPrimaryContainer
+                                    .withValues(alpha: 0.7)),
+                            const SizedBox(width: 3),
+                            Text('查表推荐',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onPrimaryContainer
+                                        .withValues(alpha: 0.7))),
+                          ],
+                        ),
+                      ),
                   ]),
                   const SizedBox(height: 16),
                   Row(children: [
                     _TargetColumn(
                         icon: Icons.fitness_center,
                         label: '蛋白质',
-                        value:
-                            '${_calcDailyProtein().toStringAsFixed(0)}g',
+                        value: '${_calcDailyProtein().toStringAsFixed(0)}g',
                         color: theme.colorScheme.onPrimaryContainer),
                     Container(
                         height: 50,
@@ -458,8 +650,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _TargetColumn(
                         icon: Icons.grain,
                         label: '碳水',
-                        value:
-                            '${_calcDailyCarbs().toStringAsFixed(0)}g',
+                        value: '${_calcDailyCarbs().toStringAsFixed(0)}g',
                         color: theme.colorScheme.onPrimaryContainer),
                     Container(
                         height: 50,
@@ -488,10 +679,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 8),
                       Text(
                         p.goal == FitnessGoal.fatLoss
-                            ? '减脂期高蛋白摄入（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）有助于保留肌肉，适量碳水维持训练表现。'
+                            ? _hasAppliedRecommendation
+                                ? '减脂期（纯饮食控制），基于身高${p.height.toStringAsFixed(0)}cm / 体重${p.weight.toStringAsFixed(0)}kg / ${p.gender == Gender.male ? "男" : "女"} 的参考表推荐：蛋白质 ${p.proteinPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyProtein().toStringAsFixed(0)} g），碳水 ${p.carbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyCarbs().toStringAsFixed(0)} g）。'
+                                : '减脂期高蛋白摄入（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）有助于保留肌肉，适量碳水维持训练表现。'
                             : '增肌期适量蛋白（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）配合充足碳水为训练供能，促进肌肉合成。',
-                        style: TextStyle(
-                            color: Colors.grey[400], fontSize: 13),
+                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
                       ),
                     ]))),
         const SizedBox(height: 16),
@@ -514,8 +706,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(children: [
-                Icon(Icons.restaurant_menu,
-                    color: theme.colorScheme.primary),
+                Icon(Icons.restaurant_menu, color: theme.colorScheme.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -523,8 +714,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Text('配餐模板',
                             style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15)),
+                                fontWeight: FontWeight.w600, fontSize: 15)),
                         Text('共 ${widget.templates.length} 个已保存的模板',
                             style: TextStyle(
                                 color: Colors.grey[400], fontSize: 13)),
@@ -559,12 +749,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   double _calcDailyCarbs() {
     final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
-    final ck =
-        double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
+    final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
     return w * ck;
   }
 
-  double _calcDailyCalories() => _calcDailyProtein() * 4 + _calcDailyCarbs() * 4;
+  double _calcDailyCalories() =>
+      _calcDailyProtein() * 4 + _calcDailyCarbs() * 4;
 }
 
 class _TargetColumn extends StatelessWidget {
@@ -588,12 +778,9 @@ class _TargetColumn extends StatelessWidget {
       const SizedBox(height: 4),
       Text(value,
           style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: color)),
+              fontSize: 28, fontWeight: FontWeight.w800, color: color)),
       Text(label,
-          style: TextStyle(
-              fontSize: 13, color: color.withValues(alpha: 0.7))),
+          style: TextStyle(fontSize: 13, color: color.withValues(alpha: 0.7))),
     ]));
   }
 }

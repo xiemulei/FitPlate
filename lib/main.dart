@@ -21,4 +21,4 @@ class MacroMealApp extends StatelessWidget {
       home: const HomeScreen(),
     );
   }
-}
+}

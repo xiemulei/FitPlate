@@ -17,6 +17,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _proteinCtrl;
   late TextEditingController _carbsCtrl;
+  late TextEditingController _gramsPerUnitCtrl;
+  late FoodUnit _unit;
   late String _category;
   late String? _subcategory;
   bool get _isNew => widget.food == null;
@@ -31,8 +33,12 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     _carbsCtrl = TextEditingController(
       text: widget.food?.carbsPer100G.toStringAsFixed(4) ?? '0.00',
     );
+    _unit = widget.food?.unit ?? FoodUnit.grams100g;
     _category = widget.food?.category ?? '未分类';
     _subcategory = widget.food?.subcategory;
+    _gramsPerUnitCtrl = TextEditingController(
+      text: widget.food?.gramsPerUnit?.toStringAsFixed(1) ?? '',
+    );
   }
 
   @override
@@ -40,6 +46,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     _nameCtrl.dispose();
     _proteinCtrl.dispose();
     _carbsCtrl.dispose();
+    _gramsPerUnitCtrl.dispose();
     super.dispose();
   }
 
@@ -48,13 +55,19 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     if (name.isEmpty) return null;
     final protein = double.tryParse(_proteinCtrl.text) ?? 0.0;
     final carbs = double.tryParse(_carbsCtrl.text) ?? 0.0;
+    final gpuText = _gramsPerUnitCtrl.text.trim();
+    final gpu = _unit.isItemUnit && gpuText.isNotEmpty
+        ? double.tryParse(gpuText)
+        : null;
     return Food(
       id: widget.food?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
+      unit: _unit,
       proteinPer100G: protein,
       carbsPer100G: carbs,
       category: _category,
       subcategory: _subcategory,
+      gramsPerUnit: gpu,
     );
   }
 
@@ -80,7 +93,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         title: const Text('删除食物'),
         content: Text('确定要删除「${widget.food!.name}」吗？'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
@@ -125,7 +139,9 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               radius: 48,
               backgroundColor: _categoryColor(theme),
               child: Text(
-                _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0].toUpperCase() : '?',
+                _nameCtrl.text.isNotEmpty
+                    ? _nameCtrl.text[0].toUpperCase()
+                    : '?',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w800,
@@ -151,6 +167,50 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           ),
           const SizedBox(height: 20),
 
+          // 计量单位选择
+          DropdownButtonFormField<FoodUnit>(
+            value: _unit,
+            decoration: const InputDecoration(
+              labelText: '计量单位',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.scale),
+              helperText: 'g/100g = 每100克，个/份/杯 = 按件计量',
+              helperMaxLines: 2,
+            ),
+            items: FoodUnit.values
+                .map((u) => DropdownMenuItem(
+                      value: u,
+                      child: Text(u.label,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() {
+              if (v != null) _unit = v;
+            }),
+          ),
+          const SizedBox(height: 20),
+
+          // 每单位克数（仅对"个/份/杯"显示）
+          if (_unit.isItemUnit) ...[
+            TextField(
+              controller: _gramsPerUnitCtrl,
+              decoration: InputDecoration(
+                labelText: '每个${_unit.label}约多少克',
+                hintText: '如：鸡蛋50g，馒头100g',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.monitor_weight),
+                suffixText: 'g/${_unit.label}',
+                suffixStyle: TextStyle(color: Colors.grey[500]),
+                helperText: '用于自动换算每${_unit.label}的营养值',
+                helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 20),
+          ],
+
           // 分类选择
           DropdownButtonFormField<String>(
             value: _category,
@@ -159,7 +219,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.category),
             ),
-            items: PresetFoods.categories.followedBy(['未分类'])
+            items: PresetFoods.categories
+                .followedBy(['未分类'])
                 .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                 .toList(),
             onChanged: (v) {
@@ -199,6 +260,10 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               prefixIcon: const Icon(Icons.fitness_center),
               suffixText: 'g/100g',
               suffixStyle: TextStyle(color: Colors.grey[500]),
+              helperText: _unit.isItemUnit && _unit != FoodUnit.grams100g
+                  ? '填写每${_unit.label}的蛋白质含量'
+                  : null,
+              helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.next,
@@ -215,6 +280,10 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               prefixIcon: const Icon(Icons.grain),
               suffixText: 'g/100g',
               suffixStyle: TextStyle(color: Colors.grey[500]),
+              helperText: _unit.isItemUnit && _unit != FoodUnit.grams100g
+                  ? '填写每${_unit.label}的碳水含量'
+                  : null,
+              helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textInputAction: TextInputAction.done,
@@ -222,29 +291,43 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           ),
           const SizedBox(height: 32),
 
-          // 营养信息卡片
-          if (!_isNew) ...{
+          // 营养信息预览
+          if (!_isNew) ...[
             Card(
               color: theme.colorScheme.surfaceContainerHighest,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    Text('每 100g 营养成分', style: theme.textTheme.titleSmall),
+                    Text('每${_unit.isItemUnit ? _unit.label : '100g'}营养成分',
+                        style: theme.textTheme.titleSmall),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _nutrientCol('蛋白质', '${widget.food!.proteinPer100G.toStringAsFixed(1)}g', Colors.orange),
-                        _nutrientCol('碳水', '${widget.food!.carbsPer100G.toStringAsFixed(1)}g', Colors.green),
+                        _nutrientCol(
+                            '蛋白质',
+                            '${widget.food!.proteinPer100G.toStringAsFixed(1)}g',
+                            Colors.orange),
+                        _nutrientCol(
+                            '碳水',
+                            '${widget.food!.carbsPer100G.toStringAsFixed(1)}g',
+                            Colors.green),
                       ],
                     ),
+                    if (widget.food!.gramsPerUnit != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                          '1${widget.food!.unit.label} ≈ ${widget.food!.gramsPerUnit!.toStringAsFixed(0)}g',
+                          style:
+                              TextStyle(color: Colors.grey[400], fontSize: 13)),
+                    ],
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 16),
-          },
+          ],
 
           // 保存按钮
           FilledButton.icon(
@@ -284,7 +367,9 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   Widget _nutrientCol(String label, String value, Color color) {
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w800, color: color)),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[400])),
       ],

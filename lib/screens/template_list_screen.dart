@@ -11,6 +11,14 @@ class TemplateListScreen extends StatelessWidget {
     required this.templates,
   });
 
+  Map<Food, double> _calculate(MealTemplate template) {
+    return MealCalculator.calculate(
+      target: template.target,
+      allFoods: foods,
+      selected: template.selections,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -26,7 +34,8 @@ class TemplateListScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text('还没有保存的模板', style: TextStyle(color: Colors.grey[400])),
               const SizedBox(height: 8),
-              Text('先在配餐页面计算结果后保存吧！', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              Text('先在配餐页面计算结果后保存吧！',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 13)),
             ],
           ),
         ),
@@ -41,8 +50,10 @@ class TemplateListScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final template = templates[index];
           final results = _calculate(template);
-          final actualP = results.entries.fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
-          final actualC = results.entries.fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
+          final actualP = results.entries
+              .fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
+          final actualC = results.entries
+              .fold(0.0, (s, e) => s + e.key.carbsPer100G / 100 * e.value);
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
@@ -53,42 +64,64 @@ class TemplateListScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.bookmark, color: theme.colorScheme.primary, size: 20),
+                      Icon(Icons.bookmark,
+                          color: theme.colorScheme.primary, size: 20),
                       const SizedBox(width: 8),
-                      Text(template.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text(template.name,
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 16)),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primaryContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           '目标 ${template.target.protein.toStringAsFixed(0)}P / ${template.target.carbs.toStringAsFixed(0)}C',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: theme.colorScheme.primary),
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary),
                         ),
                       ),
                     ],
                   ),
                   const Divider(),
                   ...results.entries.map((e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(e.key.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                        Text(
-                          '${e.value.toStringAsFixed(0)}g (蛋白 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g, 碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g)',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Text(e.key.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 4),
+                                Text('(${e.key.unitLabel})',
+                                    style: TextStyle(
+                                        color: Colors.grey[500], fontSize: 11)),
+                              ],
+                            ),
+                            Text(
+                              '${FoodAmountFormatter.formatAmount(e.key, e.value)} (蛋白 ${(e.key.proteinPer100G / 100 * e.value).toStringAsFixed(1)}g, 碳水 ${(e.key.carbsPer100G / 100 * e.value).toStringAsFixed(1)}g)',
+                              style: TextStyle(
+                                  color: Colors.grey[400], fontSize: 12),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  )),
+                      )),
                   const Divider(),
                   Row(
                     children: [
-                      Text('实际: ${actualP.toStringAsFixed(1)}g 蛋白质 / ${actualC.toStringAsFixed(1)}g 碳水',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.primary)),
+                      Text(
+                          '实际: ${actualP.toStringAsFixed(1)}g 蛋白质 / ${actualC.toStringAsFixed(1)}g 碳水',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary)),
                     ],
                   ),
                 ],
@@ -98,17 +131,5 @@ class TemplateListScreen extends StatelessWidget {
         },
       ),
     );
-  }
-
-  Map<Food, double> _calculate(MealTemplate template) {
-    final selFoods = template.selections.map((sf) {
-      final food = foods.firstWhere((f) => f.id == sf.foodId,
-          orElse: () => Food(id: '', name: '未知食物', proteinPer100G: 0, carbsPer100G: 0, unit: 'g/100g'));
-      return (food, sf.ratio);
-    }).toList();
-    final totalWp = selFoods.fold(0.0, (sum, f) => sum + f.$1.proteinPer100G / 100 * f.$2);
-    if (totalWp <= 0) return {};
-    final k = template.target.protein / totalWp;
-    return {for (final f in selFoods) f.$1: f.$2 * k};
   }
 }

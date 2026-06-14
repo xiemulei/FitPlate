@@ -38,7 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = await StorageService.loadTemplates();
     final pr = await StorageService.loadProfile();
     final c = await StorageService.loadCycles();
-    setState(() { _templates = t; _cycles = c; _profile = pr; });
+    setState(() {
+      _templates = t;
+      _cycles = c;
+      _profile = pr;
+    });
   }
 
   Future<void> _onProfileChanged(UserProfile p) async {
@@ -63,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
         templates: _templates,
         foods: _foods,
         onGoToCycle: () => setState(() => _currentIndex = 3),
+        profile: _profile,
       ),
       FoodLibraryScreen(
         foods: _foods,
@@ -72,7 +77,10 @@ class _HomeScreenState extends State<HomeScreen> {
         foods: _foods,
         target: _target,
         selected: _selected,
-        onTargetChanged: (t) => setState(() { _target.protein = t.protein; _target.carbs = t.carbs; }),
+        onTargetChanged: (t) => setState(() {
+          _target.protein = t.protein;
+          _target.carbs = t.carbs;
+        }),
         onSelectedChanged: (s) => setState(() => _selected = s),
         templates: _templates,
         onSaveTemplate: (t) async {
@@ -95,7 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FitPlate', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('FitPlate',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         centerTitle: false,
       ),
       body: pages[_currentIndex],
@@ -120,7 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.today_outlined), label: '今天'),
-          NavigationDestination(icon: Icon(Icons.kitchen_outlined), label: '食物库'),
+          NavigationDestination(
+              icon: Icon(Icons.kitchen_outlined), label: '食物库'),
           NavigationDestination(icon: Icon(Icons.scale_outlined), label: '配餐'),
           NavigationDestination(icon: Icon(Icons.loop_outlined), label: '循环'),
           NavigationDestination(icon: Icon(Icons.person_outlined), label: '个人'),
