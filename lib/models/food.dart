@@ -157,23 +157,17 @@ class MealTemplate {
       );
 }
 
-class MealType {
-  final String name;
-  double defaultProtein;
-  double defaultCarbs;
+enum MealType {
+  breakfast('早餐'),
+  lunch('午餐'),
+  dinner('晚餐'),
+  postWorkout('练后餐'),
+  snack('加餐');
 
-  MealType(
-      {required this.name,
-      required this.defaultProtein,
-      required this.defaultCarbs});
+  final String label;
+  const MealType(this.label);
 
-  static final List<MealType> defaults = [
-    MealType(name: '早餐', defaultProtein: 20, defaultCarbs: 30),
-    MealType(name: '午餐', defaultProtein: 35, defaultCarbs: 40),
-    MealType(name: '晚餐', defaultProtein: 30, defaultCarbs: 25),
-    MealType(name: '练后餐', defaultProtein: 35, defaultCarbs: 40),
-    MealType(name: '加餐', defaultProtein: 15, defaultCarbs: 20),
-  ];
+  static const List<MealType> defaults = MealType.values;
 }
 
 // MealCalculator 和 FoodAmountFormatter 已移至 lib/utils/meal_utils.dart

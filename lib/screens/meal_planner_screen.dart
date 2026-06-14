@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
+import '../models/user_profile.dart';
+import '../data/meal_distribution.dart';
 import '../utils/meal_utils.dart';
 
 class MealPlannerScreen extends StatefulWidget {
   final List<Food> foods;
-  final MealTarget target;
   final List<SelectedFood> selected;
-  final ValueChanged<MealTarget> onTargetChanged;
   final ValueChanged<List<SelectedFood>> onSelectedChanged;
   final List<MealTemplate> templates;
   final ValueChanged<MealTemplate> onSaveTemplate;
+  final UserProfile? profile;
 
   const MealPlannerScreen({
     super.key,
     required this.foods,
-    required this.target,
     required this.selected,
-    required this.onTargetChanged,
     required this.onSelectedChanged,
     required this.templates,
     required this.onSaveTemplate,
+    this.profile,
   });
 
   @override
@@ -32,24 +32,71 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   late TextEditingController _cCtrl;
   final _nameCtrl = TextEditingController();
   bool _showResults = false;
+  MealTarget? _currentTarget;
 
   @override
   void initState() {
     super.initState();
-    _pCtrl =
-        TextEditingController(text: widget.target.protein.toStringAsFixed(1));
-    _cCtrl =
-        TextEditingController(text: widget.target.carbs.toStringAsFixed(1));
+    _pCtrl = TextEditingController(text: '0');
+    _cCtrl = TextEditingController(text: '0');
+  }
+
+  @override
+  void dispose() {
+    _pCtrl.dispose();
+    _cCtrl.dispose();
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  /// 根据个人资料自动计算该餐的营养目标
+  MealTarget _calculateTarget(MealType type) {
+    final profile = widget.profile;
+    if (profile == null) return _fallbackTarget(type);
+
+    final isStrengthTraining = !profile.noStrengthTraining;
+    final isTrainingDay = isStrengthTraining;
+
+    if (isStrengthTraining) {
+      final dist = MealDistributions.forTrainingTime(profile.trainingTime);
+      if (dist != null) {
+        return dist.calculateTarget(type, profile, isTrainingDay: isTrainingDay);
+      }
+    } else {
+      final portion = MealDistributions.findNoStrengthPortion(type);
+      if (portion != null) {
+        return MealTarget(
+          protein: profile.dailyProtein * portion.proteinRatio,
+          carbs: profile.dailyCarbs * portion.carbRatio,
+        );
+      }
+    }
+    return _fallbackTarget(type);
+  }
+
+  MealTarget _fallbackTarget(MealType type) {
+    switch (type) {
+      case MealType.breakfast:
+        return const MealTarget(protein: 20, carbs: 30);
+      case MealType.lunch:
+        return const MealTarget(protein: 30, carbs: 40);
+      case MealType.dinner:
+        return const MealTarget(protein: 25, carbs: 30);
+      case MealType.postWorkout:
+        return const MealTarget(protein: 30, carbs: 40);
+      case MealType.snack:
+        return const MealTarget(protein: 15, carbs: 20);
+    }
   }
 
   void _applyMealType(MealType? type) {
     setState(() {
       _selectedType = type;
       if (type != null) {
-        _pCtrl.text = type.defaultProtein.toStringAsFixed(1);
-        _cCtrl.text = type.defaultCarbs.toStringAsFixed(1);
-        widget.onTargetChanged(
-            MealTarget(protein: type.defaultProtein, carbs: type.defaultCarbs));
+        final target = _calculateTarget(type);
+        _currentTarget = target;
+        _pCtrl.text = target.protein.toStringAsFixed(1);
+        _cCtrl.text = target.carbs.toStringAsFixed(1);
       }
     });
   }
@@ -57,7 +104,7 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   void _updateTarget() {
     final p = double.tryParse(_pCtrl.text) ?? 0.0;
     final c = double.tryParse(_cCtrl.text) ?? 0.0;
-    widget.onTargetChanged(MealTarget(protein: p, carbs: c));
+    _currentTarget = MealTarget(protein: p, carbs: c);
   }
 
   void _toggleFood(String id) {
@@ -81,8 +128,9 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   }
 
   Map<Food, double> _calculate() {
+    final target = _currentTarget ?? const MealTarget(protein: 30, carbs: 40);
     return MealCalculator.calculate(
-      target: widget.target,
+      target: target,
       allFoods: widget.foods,
       selected: widget.selected,
     );
@@ -91,10 +139,11 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   void _saveTemplate() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+    final target = _currentTarget ?? const MealTarget(protein: 30, carbs: 40);
     widget.onSaveTemplate(MealTemplate(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
-      target: widget.target,
+      target: target,
       selections: widget.selected,
     ));
     _nameCtrl.clear();
@@ -102,21 +151,44 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   }
 
   @override
-  void dispose() {
-    _pCtrl.dispose();
-    _cCtrl.dispose();
-    _nameCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final mealTypes = MealType.defaults;
 
+    // 显示个人资料摘要（如果有）
+    final profile = widget.profile;
+    final hasProfile = profile != null;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // ── 个人资料摘要 ──
+        if (hasProfile) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(children: [
+              Icon(Icons.person_outline,
+                  size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${profile.weight.toStringAsFixed(0)}kg · '
+                  '蛋${profile.proteinPerKg.toStringAsFixed(1)}g/kg · '
+                  '碳${profile.carbsPerKg.toStringAsFixed(1)}g/kg · '
+                  '每日 ${profile.dailyProtein.toStringAsFixed(0)}g蛋白 / ${profile.dailyCarbs.toStringAsFixed(0)}g碳水',
+                  style: TextStyle(
+                      fontSize: 12, color: theme.colorScheme.primary),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+        ],
+
         // Meal type chips
         Text('选择餐次',
             style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
@@ -129,13 +201,25 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
               final mt = mealTypes[i];
-              final selected = _selectedType?.name == mt.name;
+              final selected = _selectedType == mt;
+              // 如果有 profile，计算该餐的目标值用于预览
+              String subtitle;
+              if (hasProfile) {
+                final t = _calculateTarget(mt);
+                subtitle =
+                    '${t.protein.toStringAsFixed(0)}P/${t.carbs.toStringAsFixed(0)}C';
+              } else {
+                final fallback = _fallbackTarget(mt);
+                subtitle =
+                    '${fallback.protein.toStringAsFixed(0)}P/${fallback.carbs.toStringAsFixed(0)}C';
+              }
               return ChoiceChip(
                 label: Text(
-                    '${mt.name}\n${mt.defaultProtein.toStringAsFixed(0)}P/${mt.defaultCarbs.toStringAsFixed(0)}C',
-                    textAlign: TextAlign.center,
-                    style:
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  '${mt.label}\n$subtitle',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600),
+                ),
                 selected: selected,
                 onSelected: (val) => _applyMealType(val ? mt : null),
               );
@@ -157,9 +241,19 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                       if (_selectedType != null)
                         Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: Text(_selectedType!.name,
+                            child: Text(_selectedType!.label,
                                 style: TextStyle(
                                     color: Colors.grey[400], fontSize: 13))),
+                      if (hasProfile && _selectedType != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '基于个人资料自动计算',
+                          style: TextStyle(
+                              color: Colors.green[400],
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Row(children: [
                         Expanded(
@@ -198,15 +292,16 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                               ?.copyWith(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
                       Text('点击选择，拖动滑块调整比例',
-                          style:
-                              TextStyle(color: Colors.grey[500], fontSize: 13)),
+                          style: TextStyle(
+                              color: Colors.grey[500], fontSize: 13)),
                       const SizedBox(height: 8),
                       if (widget.foods.isEmpty)
                         Padding(
                             padding: const EdgeInsets.all(24),
                             child: Center(
                                 child: Text('还没有食物，先去食物库添加吧',
-                                    style: TextStyle(color: Colors.grey[500]))))
+                                    style:
+                                        TextStyle(color: Colors.grey[500]))))
                       else
                         ...widget.foods.map((food) {
                           final isSel =
@@ -231,7 +326,9 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                                       : theme
                                           .colorScheme.surfaceContainerHighest,
                                   child: Text(
-                                      food.name.isNotEmpty ? food.name[0] : '?',
+                                      food.name.isNotEmpty
+                                          ? food.name[0]
+                                          : '?',
                                       style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 14,
@@ -319,6 +416,7 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
       ];
     }
 
+    final target = _currentTarget ?? const MealTarget(protein: 30, carbs: 40);
     final actualP = results.entries
         .fold(0.0, (s, e) => s + e.key.proteinPer100G / 100 * e.value);
     final actualC = results.entries
@@ -391,7 +489,7 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                                 fontWeight: FontWeight.w800,
                                 color: Colors.orange)),
                         Text(
-                            '蛋白质 · 目标 ${widget.target.protein.toStringAsFixed(1)}g',
+                            '蛋白质 · 目标 ${target.protein.toStringAsFixed(1)}g',
                             style: TextStyle(
                                 color: Colors.grey[400], fontSize: 11)),
                       ]))),
@@ -408,8 +506,7 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.green)),
-                        Text(
-                            '碳水 · 目标 ${widget.target.carbs.toStringAsFixed(1)}g',
+                        Text('碳水 · 目标 ${target.carbs.toStringAsFixed(1)}g',
                             style: TextStyle(
                                 color: Colors.grey[400], fontSize: 11)),
                       ]))),
