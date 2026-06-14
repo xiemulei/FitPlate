@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
-import '../utils/meal_utils.dart';
+import '../models/meal_plan.dart';
 import '../models/cycle.dart';
 import '../models/user_profile.dart';
+import '../services/meal_plan_service.dart';
 import '../widgets/template_meal_card.dart';
+import '../utils/meal_utils.dart';
 
 class TodayScreen extends StatefulWidget {
   final List<TrainingCycle> cycles;
@@ -47,7 +49,9 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final active = widget.cycles.where((c) => c.isActive).firstOrNull;
+    final profile = widget.profile;
 
+    // ── 没有活跃循环 ──
     if (active == null) {
       return Center(
         child: Column(
@@ -62,7 +66,7 @@ class _TodayScreenState extends State<TodayScreen> {
             Text('还没有激活的训练循环',
                 style: TextStyle(color: Colors.grey[400], fontSize: 15)),
             const SizedBox(height: 8),
-            Text('先创建一个循环，然后分配配餐模板吧！',
+            Text('先创建一个循环，然后自动生成配餐计划！',
                 style: TextStyle(color: Colors.grey[500], fontSize: 13)),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -75,14 +79,27 @@ class _TodayScreenState extends State<TodayScreen> {
       );
     }
 
+    // ── 有活跃循环 ──
     final todayDay = active.todayDay;
     final todayLabel = todayDay?.label ?? '第${(active.todayIndex ?? 0) + 1}天';
+    final isRestDay = todayDay?.isRestDay ?? false;
+
+    // 生成今日配餐目标
+    List<MealPlanEntry>? todayMeals;
+    if (profile != null) {
+      todayMeals = MealPlanService.getTodayMeals(
+        activeCycle: active,
+        profile: profile,
+      );
+    }
+
+    // 旧的模板（如果有）
     final template = _findTemplate(todayDay?.mealTemplateId);
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Header
+        // ── 头部 ──
         Row(
           children: [
             CircleAvatar(
@@ -95,10 +112,10 @@ class _TodayScreenState extends State<TodayScreen> {
                 child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('今天吃什么',
+                Text(isRestDay ? '今天休息' : '练起来！',
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w700)),
-                Text('循环: ${active.name} · $todayLabel',
+                Text('${active.name} · $todayLabel',
                     style: TextStyle(color: Colors.grey[400], fontSize: 13)),
               ],
             )),
@@ -106,7 +123,7 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Cycle progress
+        // ── 循环进度 ──
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -159,8 +176,8 @@ class _TodayScreenState extends State<TodayScreen> {
                         size: 12, color: theme.colorScheme.primary),
                     const SizedBox(width: 4),
                     Text('今天',
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.grey[400])),
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400])),
                     const SizedBox(width: 12),
                     Container(
                         width: 12,
@@ -171,8 +188,8 @@ class _TodayScreenState extends State<TodayScreen> {
                         )),
                     const SizedBox(width: 4),
                     Text('训练日',
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.grey[400])),
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400])),
                     const SizedBox(width: 12),
                     Container(
                         width: 12,
@@ -183,8 +200,8 @@ class _TodayScreenState extends State<TodayScreen> {
                         )),
                     const SizedBox(width: 4),
                     Text('休息日',
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.grey[400])),
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[400])),
                   ],
                 ),
               ],
@@ -193,28 +210,28 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Training time suggestion
-        if (widget.profile != null) ...[
+        // ── 训练时段提示 ──
+        if (profile != null) ...[
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Text(widget.profile!.trainingTime.icon,
+                  Text(profile.trainingTime.icon,
                       style: const TextStyle(fontSize: 24)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('训练时段: ${widget.profile!.trainingTime.label}',
+                        Text('训练时段: ${profile.trainingTime.label}',
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600, fontSize: 14)),
                         const SizedBox(height: 2),
-                        Text(widget.profile!.trainingTime.dietDescription,
+                        Text(profile.trainingTime.dietDescription,
                             style: TextStyle(
                                 color: Colors.grey[400], fontSize: 12)),
-                        if (widget.profile!.noStrengthTraining) ...[
+                        if (profile.noStrengthTraining) ...[
                           const SizedBox(height: 4),
                           Text('纯饮食控制模式',
                               style: TextStyle(
@@ -232,34 +249,160 @@ class _TodayScreenState extends State<TodayScreen> {
           const SizedBox(height: 12),
         ],
 
-        // Today's meal
-        if (template != null)
-          TemplateMealCard(
-            template: template,
-            results: _calculate(template),
-          )
-        else
+        // ── 今日配餐目标（核心新增） ──
+        if (todayMeals != null && todayMeals.isNotEmpty) ...[
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.info_outline, size: 40, color: Colors.grey[500]),
-                    const SizedBox(height: 8),
-                    Text('这天还没分配配餐模板',
-                        style: TextStyle(color: Colors.grey[400])),
-                    const SizedBox(height: 4),
-                    Text('去「循环」页面设置',
-                        style:
-                            TextStyle(color: Colors.grey[500], fontSize: 13)),
-                  ],
-                ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.restaurant_menu,
+                        size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(isRestDay ? '休息日配餐目标' : '训练日配餐目标',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                    '每餐目标 = 根据你的体重 × 系数自动计算',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 各餐目标卡片
+                  ...todayMeals.map((meal) {
+                    IconData icon;
+                    Color color;
+                    switch (meal.type) {
+                      case MealType.breakfast:
+                        icon = Icons.wb_sunny;
+                        color = Colors.orange;
+                        break;
+                      case MealType.postWorkout:
+                        icon = Icons.fitness_center;
+                        color = Colors.green;
+                        break;
+                      case MealType.lunch:
+                        icon = Icons.restaurant;
+                        color = Colors.blue;
+                        break;
+                      case MealType.dinner:
+                        icon = Icons.nights_stay;
+                        color = Colors.purple;
+                        break;
+                      case MealType.snack:
+                        icon = Icons.cookie;
+                        color = Colors.brown;
+                        break;
+                      default:
+                        icon = Icons.restaurant_menu;
+                        color = Colors.grey;
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: color.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(icon, size: 20, color: color),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(meal.label,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14)),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('碳水 ${meal.carbsG}g',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange[800])),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('蛋白 ${meal.proteinG}g',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green[800])),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 8),
+
+                  // 每日合计
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer
+                          .withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('本日合计  ',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 12)),
+                        Text(
+                            '碳水 ${todayMeals.fold(0, (s, e) => s + e.carbsG)}g',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Colors.orange[700])),
+                        const SizedBox(width: 12),
+                        Text(
+                            '蛋白质 ${todayMeals.fold(0, (s, e) => s + e.proteinG)}g',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Colors.green[700])),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          const SizedBox(height: 12),
+        ],
+
+        // ── 旧的模板（备选） ──
+        if (template != null && todayMeals == null)
+          TemplateMealCard(
+            template: template,
+            results: _calculate(template),
+          ),
+
         const SizedBox(height: 16),
 
+        // ── 管理循环 ──
         OutlinedButton.icon(
           onPressed: widget.onGoToCycle,
           icon: const Icon(Icons.settings),
@@ -268,7 +411,6 @@ class _TodayScreenState extends State<TodayScreen> {
       ],
     );
   }
-
 
   void _showDayDetail(BuildContext context, TrainingCycle cycle, CycleDay day) {
     final template = _findTemplate(day.mealTemplateId);
@@ -294,7 +436,8 @@ class _TodayScreenState extends State<TodayScreen> {
                   style: TextStyle(color: Colors.grey[400])),
             ] else ...[
               const SizedBox(height: 12),
-              Text('未分配配餐模板', style: TextStyle(color: Colors.grey[500])),
+              Text('自动配餐计划已生成',
+                  style: TextStyle(color: Colors.grey[400])),
             ],
           ],
         ),
