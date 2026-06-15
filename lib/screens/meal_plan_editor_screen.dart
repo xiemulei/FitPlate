@@ -644,17 +644,32 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
           if (isSel) ...[
             const SizedBox(width: 6),
             SizedBox(
-              width: 80,
-              child: Slider(
-                value: sel.grams.clamp(10, 500),
-                min: 10,
-                max: 500,
-                divisions: 49,
-                label: '${sel.grams.round()}g',
-                onChanged: (v) => _updateGrams(food.id, v),
+              width: 60,
+              child: TextField(
+                controller: TextEditingController(
+                    text: '${sel.grams.round()}'),
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  border: OutlineInputBorder(),
+                ),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontWeight: FontWeight.w600),
+                onChanged: (v) {
+                  final parsed = double.tryParse(v);
+                  if (parsed != null && parsed > 0) {
+                    _updateGrams(food.id, parsed);
+                  }
+                },
               ),
             ),
-            Text('${sel.grams.round()}g',
+            const SizedBox(width: 2),
+            Text('g',
                 style: TextStyle(fontSize: 11, color: color)),
           ],
         ]),
