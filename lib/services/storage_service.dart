@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../models/food.dart';
 import '../models/user_profile.dart';
 import '../models/cycle.dart';
+import '../models/meal_plan_template.dart';
 
 class StorageService {
   static Future<Directory> get _dir async {
@@ -89,7 +90,28 @@ class StorageService {
 
   static Future<void> saveCycles(List<TrainingCycle> cycles) async {
     final f = await _path('cycles.json');
-    await File(f)
-        .writeAsString(jsonEncode(cycles.map((c) => c.toJson()).toList()));
+    await File(f).writeAsString(jsonEncode(cycles.map((c) => c.toJson()).toList()));
+  }
+
+  // ═════════════════════════════════
+  //  配餐方案模板
+  // ═════════════════════════════════
+
+  static Future<List<MealPlanTemplate>> loadMealPlanTemplates() async {
+    try {
+      final f = await _path('meal_plans.json');
+      final s = await File(f).readAsString();
+      final list = jsonDecode(s) as List;
+      return list.map((j) => MealPlanTemplate.fromJson(j)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> saveMealPlanTemplates(
+      List<MealPlanTemplate> templates) async {
+    final f = await _path('meal_plans.json');
+    await File(f).writeAsString(
+        jsonEncode(templates.where((t) => !t.isBuiltIn).map((t) => t.toJson()).toList()));
   }
 }

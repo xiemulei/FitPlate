@@ -21,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   List<Food> _foods = [];
-  List<SelectedFood> _selected = [];
   List<MealTemplate> _templates = [];
   List<TrainingCycle> _cycles = [];
   UserProfile _profile = UserProfile();
@@ -49,10 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await StorageService.saveProfile(p);
   }
 
-  Future<void> _saveTemplates() async {
-    await StorageService.saveTemplates(_templates);
-  }
-
   Future<void> _onCyclesChanged(List<TrainingCycle> cycles) async {
     setState(() => _cycles = cycles);
     await StorageService.saveCycles(cycles);
@@ -74,13 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       MealPlannerScreen(
         foods: _foods,
-        selected: _selected,
-        onSelectedChanged: (s) => setState(() => _selected = s),
-        templates: _templates,
-        onSaveTemplate: (t) async {
-          setState(() => _templates.add(t));
-          await _saveTemplates();
-        },
         profile: _profile,
       ),
       CycleScreen(
