@@ -4,7 +4,7 @@ import '../data/food_data.dart';
 import '../utils/constants.dart';
 import 'food_detail_screen.dart';
 
-class FoodLibraryScreen extends StatelessWidget {
+class FoodLibraryScreen extends StatefulWidget {
   final List<Food> foods;
   final ValueChanged<List<Food>> onFoodsChanged;
 
@@ -15,121 +15,238 @@ class FoodLibraryScreen extends StatelessWidget {
   });
 
   @override
+  State<FoodLibraryScreen> createState() => _FoodLibraryScreenState();
+}
+
+class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
+
+  Set<String> get _presetIds => PresetFoods.all.map((f) => f.id).toSet();
+
+  List<Food> get _presetFoods =>
+      widget.foods.where((f) => _presetIds.contains(f.id)).toList();
+
+  List<Food> get _customFoods =>
+      widget.foods.where((f) => !_presetIds.contains(f.id)).toList();
+
+  // ─────────────────────────────────────────────
+  // 搜索结果
+  // ─────────────────────────────────────────────
+
+  List<Food> get _searchResults {
+    if (!_isSearching) return [];
+    final q = _searchQuery.trim().toLowerCase();
+    return widget.foods.where((f) => f.name.toLowerCase().contains(q)).toList();
+  }
+
+  // ─────────────────────────────────────────────
+  // 分类分组（浏览模式）
+  // ─────────────────────────────────────────────
+
+  List<_CategoryGroup> _buildGroups() {
+    final groups = <_CategoryGroup>[];
+
+    // 预设食物 → 按分类 + 子类分组
+    for (final cat in PresetFoods.categories) {
+      final catFoods = _presetFoods.where((f) => f.category == cat).toList();
+      if (catFoods.isEmpty) continue;
+
+      final subs = PresetFoods.subcategoriesOf(cat);
+      final subGroups = <_SubGroup>[];
+      final unsubbed = <Food>[];
+      final assignedIds = <String>{};
+
+      for (final sub in subs) {
+        final subFoods = catFoods.where((f) => f.subcategory == sub).toList();
+        if (subFoods.isNotEmpty) {
+          subGroups.add(_SubGroup(sub, subFoods));
+          assignedIds.addAll(subFoods.map((f) => f.id));
+        }
+      }
+      unsubbed.addAll(catFoods.where((f) => !assignedIds.contains(f.id)));
+
+      groups.add(_CategoryGroup(cat, subGroups, unsubbed));
+    }
+
+    // 用户自定义食物 → 合并到已有分类末尾，或新建分类
+    final customByCat = <String, List<Food>>{};
+    for (final f in _customFoods) {
+      customByCat.putIfAbsent(f.category, () => []).add(f);
+    }
+
+    for (final entry in customByCat.entries) {
+      final idx = groups.indexWhere((g) => g.category == entry.key);
+      if (idx != -1) {
+        groups[idx].unsubcategorized.addAll(entry.value);
+      } else {
+        groups.add(_CategoryGroup(entry.key, [], entry.value));
+      }
+    }
+
+    return groups;
+  }
+
+  // ─────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    if (foods.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.kitchen_outlined, size: 80, color: Colors.grey[600]),
-            const SizedBox(height: 16),
-            Text('还没有食物',
-                style:
-                    theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
-            const SizedBox(height: 8),
-            Text('点击右下角 + 添加食物', style: TextStyle(color: Colors.grey[500])),
-            const SizedBox(height: 24),
-            FilledButton.tonalIcon(
-              onPressed: () => onFoodsChanged(PresetFoods.all),
-              icon: const Icon(Icons.download),
-              label: const Text('载入预设食物库'),
-            ),
-          ],
-        ),
-      );
+    if (widget.foods.isEmpty) {
+      return _buildEmptyState(theme);
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {},
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-        itemCount: _foodItemCount,
-        itemBuilder: (context, index) => _buildRow(context, index),
-      ),
+    return Column(
+      children: [
+        _buildSearchBar(theme),
+        Expanded(
+          child: _isSearching
+              ? _buildSearchResults(theme)
+              : _buildCategoryList(theme),
+        ),
+      ],
     );
   }
 
-  /// 构建的各行：分类标题 / 子类标题 / 食物条目
-  List<_RowItem> get _rowItems {
-    final items = <_RowItem>[];
-    final grouped = PresetFoods.bySubcategory;
-
-    // 按分类 + 子类顺序排列
-    for (final cat in PresetFoods.categories) {
-      final foodsInCat = _presetFoodsFor(cat, grouped);
-      if (foodsInCat.isEmpty) continue;
-
-      // 分类标题
-      items.add(_RowItem.header(cat));
-
-      for (final entry in foodsInCat) {
-        items.add(_RowItem.subheader(entry.key));
-        for (final food in entry.value) {
-          items.add(_RowItem.food(food));
-        }
-      }
-
-      // 分隔
-      items.add(_RowItem.divider());
-    }
-
-    // 用户自定义食物（未分类的 / 不再预设中的）
-    final custom = foods.where((f) => !_presetIds.contains(f.id)).toList();
-    for (final cat in _userCategories(custom)) {
-      final catFoods = custom.where((f) => f.category == cat).toList();
-      items.add(_RowItem.header(cat));
-      for (final food in catFoods) {
-        items.add(_RowItem.food(food));
-      }
-      items.add(_RowItem.divider());
-    }
-
-    return items;
-  }
-
-  int get _foodItemCount => _rowItems.length;
-
-  Widget _buildRow(BuildContext context, int index) {
-    final item = _rowItems[index];
-
-    switch (item.type) {
-      case _RowType.header:
-        return _buildHeader(context, item.label);
-      case _RowType.subheader:
-        return _buildSubheader(context, item.label);
-      case _RowType.food:
-        return _buildFoodCard(context, item.food!);
-      case _RowType.divider:
-        return const SizedBox(height: 4);
-    }
-  }
-
-  Widget _buildHeader(BuildContext context, String title) {
-    final theme = Theme.of(context);
-    final icon = _categoryIcon(title);
-    return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 4),
-      child: Row(
+  Widget _buildEmptyState(ThemeData theme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: theme.colorScheme.primary,
-            ),
+          Icon(Icons.kitchen_outlined, size: 80, color: Colors.grey[600]),
+          const SizedBox(height: 16),
+          Text('还没有食物',
+              style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
+          const SizedBox(height: 8),
+          Text('点击右下角 + 添加食物', style: TextStyle(color: Colors.grey[500])),
+          const SizedBox(height: 24),
+          FilledButton.tonalIcon(
+            onPressed: () => widget.onFoodsChanged(PresetFoods.all),
+            icon: const Icon(Icons.download),
+            label: const Text('载入预设食物库'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSubheader(BuildContext context, String title) {
+  Widget _buildSearchBar(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: '搜索食物...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _isSearching
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHighest,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(28),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+        ),
+        onChanged: (v) => setState(() => _searchQuery = v),
+      ),
+    );
+  }
+
+  // ── 搜索结果 ──
+
+  Widget _buildSearchResults(ThemeData theme) {
+    final results = _searchResults;
+    if (results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey[500]),
+            const SizedBox(height: 12),
+            Text('没有找到 "$_searchQuery"',
+                style: TextStyle(color: Colors.grey[500])),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+      itemCount: results.length,
+      itemBuilder: (_, i) => _buildFoodCard(theme, results[i]),
+    );
+  }
+
+  // ── 分类浏览 ──
+
+  Widget _buildCategoryList(ThemeData theme) {
+    final groups = _buildGroups();
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+      itemCount: groups.length,
+      itemBuilder: (_, i) => _buildCategoryTile(theme, groups[i]),
+    );
+  }
+
+  Widget _buildCategoryTile(ThemeData theme, _CategoryGroup group) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        collapsedShape: const RoundedRectangleBorder(),
+        shape: const RoundedRectangleBorder(),
+        leading: CircleAvatar(
+          backgroundColor:
+              _categoryColor(group.category, theme).withValues(alpha: 0.2),
+          child: Icon(_categoryIcon(group.category),
+              size: 20, color: _categoryColor(group.category, theme)),
+        ),
+        title: Text(group.category,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text('${group.totalCount} 种食物',
+            style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+        children: [
+          // 子分类
+          if (group.subGroups.isNotEmpty)
+            for (final sub in group.subGroups) ...[
+              _buildSubheader(theme, sub.name),
+              for (final food in sub.foods) _buildFoodCard(theme, food),
+            ],
+          // 该分类下未归入子类的食物
+          if (group.unsubcategorized.isNotEmpty) ...[
+            if (group.subGroups.isNotEmpty) _buildSubheader(theme, '其他'),
+            for (final food in group.unsubcategorized)
+              _buildFoodCard(theme, food),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubheader(ThemeData theme, String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
       child: Text(
         title,
         style: TextStyle(
@@ -141,8 +258,10 @@ class FoodLibraryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFoodCard(BuildContext context, Food food) {
-    final theme = Theme.of(context);
+  // ── 食物卡片 ──
+
+  Widget _buildFoodCard(ThemeData theme, Food food) {
+    final isCustom = !_presetIds.contains(food.id);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
@@ -161,6 +280,20 @@ class FoodLibraryScreen extends StatelessWidget {
           children: [
             Text(food.name,
                 style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (isCustom) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('自定义',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onTertiaryContainer)),
+              ),
+            ],
             const SizedBox(width: 4),
             Text('(${food.unitLabel})',
                 style: TextStyle(color: Colors.grey[500], fontSize: 11)),
@@ -178,21 +311,24 @@ class FoodLibraryScreen extends StatelessWidget {
               builder: (_) => FoodDetailScreen(
                 food: food,
                 onDeleted: () {
-                  final updated = foods.where((f) => f.id != food.id).toList();
-                  onFoodsChanged(updated);
+                  final updated =
+                      widget.foods.where((f) => f.id != food.id).toList();
+                  widget.onFoodsChanged(updated);
                 },
               ),
             ),
           );
-          if (result != null) {
+          if (result != null && mounted) {
             final updated =
-                foods.map((f) => f.id == food.id ? result : f).toList();
-            onFoodsChanged(updated);
+                widget.foods.map((f) => f.id == food.id ? result : f).toList();
+            widget.onFoodsChanged(updated);
           }
         },
       ),
     );
   }
+
+  // ── 图标/颜色 ──
 
   IconData _categoryIcon(String category) {
     switch (category) {
@@ -210,68 +346,37 @@ class FoodLibraryScreen extends StatelessWidget {
   Color _categoryColor(String category, ThemeData theme) {
     switch (category) {
       case FoodCategory.staple:
-        return Colors.orange.withOpacity(0.2);
+        return Colors.orange;
       case FoodCategory.leanProtein:
-        return Colors.red.withOpacity(0.2);
+        return Colors.red;
       case FoodCategory.proteinPowder:
-        return Colors.purple.withOpacity(0.2);
+        return Colors.purple;
       default:
-        return theme.colorScheme.primaryContainer;
+        return theme.colorScheme.primary;
     }
-  }
-
-  Set<String> get _presetIds => PresetFoods.all.map((f) => f.id).toSet();
-
-  /// 获取预设中某分类的子类分组食物
-  List<MapEntry<String, List<Food>>> _presetFoodsFor(
-      String category, Map<String, List<Food>> grouped) {
-    final result = <MapEntry<String, List<Food>>>[];
-    final subs = PresetFoods.subcategoriesOf(category);
-    if (subs.isNotEmpty) {
-      for (final sub in subs) {
-        final subFoods = grouped[sub]
-            ?.where((f) => foods.any((ff) => ff.id == f.id))
-            .toList();
-        if (subFoods != null && subFoods.isNotEmpty) {
-          result.add(MapEntry(sub, subFoods));
-        }
-      }
-    } else {
-      final catFoods = grouped[category]
-          ?.where((f) => foods.any((ff) => ff.id == f.id))
-          .toList();
-      if (catFoods != null && catFoods.isNotEmpty) {
-        result.add(MapEntry(category, catFoods));
-      }
-    }
-    return result;
-  }
-
-  /// 用户自定义食物的分类（去重，按列表保持顺序）
-  List<String> _userCategories(List<Food> custom) {
-    final seen = <String>{};
-    final ordered = <String>[];
-    for (final f in custom) {
-      if (seen.add(f.category)) {
-        ordered.add(f.category);
-      }
-    }
-    return ordered;
   }
 }
 
-enum _RowType { header, subheader, food, divider }
+// ── 辅助数据类 ──
 
-class _RowItem {
-  final _RowType type;
-  final String label;
-  final Food? food;
+class _CategoryGroup {
+  final String category;
+  final List<_SubGroup> subGroups;
+  final List<Food> unsubcategorized;
 
-  _RowItem._(this.type, {this.label = '', this.food});
+  _CategoryGroup(this.category, this.subGroups, this.unsubcategorized);
 
-  factory _RowItem.header(String l) => _RowItem._(_RowType.header, label: l);
-  factory _RowItem.subheader(String l) =>
-      _RowItem._(_RowType.subheader, label: l);
-  factory _RowItem.food(Food f) => _RowItem._(_RowType.food, food: f);
-  factory _RowItem.divider() => _RowItem._(_RowType.divider);
+  int get totalCount {
+    var count = unsubcategorized.length;
+    for (final sub in subGroups) {
+      count += sub.foods.length;
+    }
+    return count;
+  }
+}
+
+class _SubGroup {
+  final String name;
+  final List<Food> foods;
+  _SubGroup(this.name, this.foods);
 }
