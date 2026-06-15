@@ -119,13 +119,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         isStrengthTraining: isStrengthTraining,
         goal: p.goal,
       );
-      _hasAppliedRecommendation = true;
-      // 只更新输入框预览，不直接修改 profile 对象
-      // 用户需点击「保存」或「应用推荐」才会实际写入
-      _proteinKgCtrl.text = result.$2.toStringAsFixed(1);
-      _carbsKgCtrl.text = result.$1.toStringAsFixed(1);
-      _userTweakedProtein = false;
-      _userTweakedCarbs = false;
+      // 只计算推荐值，不修改输入框或 profile 对象
+      // 用户需手动点击「应用推荐」才会写入
     } else {
       _recommendedFactor = null;
       _recommendationNote = '当前身高/体重组合暂无参考数据';
