@@ -195,7 +195,6 @@ class _CycleScreenState extends State<CycleScreen> {
         MaterialPageRoute(
           builder: (_) => CycleEditorScreen(
             cycle: cycle,
-            templates: widget.templates,
             profile: widget.profile,
             onSave: (updated) {
               widget.onCyclesChanged(widget.cycles

@@ -28,6 +28,9 @@ class TodayScreen extends StatefulWidget {
 }
 
 class _TodayScreenState extends State<TodayScreen> {
+  // 当前选中的循环日
+  int _selectedDayIndex = 0;
+
   // 每餐的食物选择
   final Map<int, List<_FoodServing>> _selections = {};
   int? _expandedMealIndex;
@@ -39,6 +42,10 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
+    final active = widget.cycles.where((c) => c.isActive).firstOrNull;
+    if (active?.todayIndex != null) {
+      _selectedDayIndex = active!.todayIndex!;
+    }
     _carbFoods = widget.foods
         .where((f) => f.category == FoodCategory.staple)
         .toList();
@@ -54,7 +61,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
   void _addCarb(int i) {
     if (_carbFoods.isEmpty) return;
-    final meal = _todayMeals?[i];
+    final meal = _mealsForDay()?[i];
     if (meal == null) return;
     final food = _carbFoods.first;
     final grams = food.carbsPer100G > 0
@@ -65,7 +72,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
   void _addProtein(int i) {
     if (_proteinFoods.isEmpty) return;
-    final meal = _todayMeals?[i];
+    final meal = _mealsForDay()?[i];
     if (meal == null) return;
     final food = _proteinFoods.first;
     final grams = food.proteinPer100G > 0
@@ -83,7 +90,7 @@ class _TodayScreenState extends State<TodayScreen> {
   void _changeFood(int i, int idx, String foodId, bool isCarb) {
     final foods = isCarb ? _carbFoods : _proteinFoods;
     final food = foods.firstWhere((f) => f.id == foodId);
-    final meal = _todayMeals![i];
+    final meal = _mealsForDay()![i];
     final newGrams = isCarb
         ? (food.carbsPer100G > 0
             ? (meal.carbsG / food.carbsPer100G * 100).clamp(10, 500).roundToDouble()
@@ -106,14 +113,19 @@ class _TodayScreenState extends State<TodayScreen> {
 
   bool _isCarbFood(Food f) => f.category == FoodCategory.staple;
 
-  // 计算今日配餐
-  List<MealPlanEntry>? get _todayMeals {
+  // 计算选中天的配餐
+  List<MealPlanEntry>? _mealsForDay() {
     final active = widget.cycles.where((c) => c.isActive).firstOrNull;
     final profile = widget.profile;
     if (active == null || profile == null) return null;
-    return MealPlanService.getTodayMeals(
-      activeCycle: active,
+    final day = active.days
+        .where((d) => d.dayIndex == _selectedDayIndex)
+        .firstOrNull;
+    if (day == null) return null;
+    return MealPlanService.generateDayMeals(
+      isRestDay: day.isRestDay,
       profile: profile,
+      trainingTime: active.trainingTime ?? profile.trainingTime,
     );
   }
 
@@ -151,10 +163,11 @@ class _TodayScreenState extends State<TodayScreen> {
       );
     }
 
-    final todayDay = active.todayDay;
-    final todayLabel = todayDay?.label ?? '第${(active.todayIndex ?? 0) + 1}天';
-    final isRestDay = todayDay?.isRestDay ?? false;
-    final meals = _todayMeals;
+    final selectedDay =
+        active.days.where((d) => d.dayIndex == _selectedDayIndex).firstOrNull;
+    final todayLabel = selectedDay?.label ?? '第${_selectedDayIndex + 1}天';
+    final isRestDay = selectedDay?.isRestDay ?? false;
+    final meals = _mealsForDay();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -172,7 +185,7 @@ class _TodayScreenState extends State<TodayScreen> {
                 child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(isRestDay ? '今天休息' : '练起来！',
+                Text(isRestDay ? '休息日' : '训练日',
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w700)),
                 Text('${active.name} · $todayLabel',
@@ -196,18 +209,19 @@ class _TodayScreenState extends State<TodayScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: active.days.map((d) {
-                    final isToday = d.dayIndex == (active.todayIndex ?? -1);
+                    final isSelected = d.dayIndex == _selectedDayIndex;
                     final isRest = d.isRestDay;
                     return Expanded(
                       child: GestureDetector(
-                        onTap: () {
-                          // 未来可扩展：点击某天查看那天配餐
-                        },
+                        onTap: () => setState(() {
+                          _selectedDayIndex = d.dayIndex;
+                          _expandedMealIndex = null;
+                        }),
                         child: Container(
                           height: 32,
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           decoration: BoxDecoration(
-                            color: isToday
+                            color: isSelected
                                 ? theme.colorScheme.primary
                                 : isRest
                                     ? Colors.grey.withValues(alpha: 0.15)
@@ -220,7 +234,7 @@ class _TodayScreenState extends State<TodayScreen> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isToday
+                                color: isSelected
                                     ? theme.colorScheme.onPrimary
                                     : theme.colorScheme.primary,
                               ),

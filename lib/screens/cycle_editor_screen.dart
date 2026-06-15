@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
-import '../models/food.dart';
 import '../models/cycle.dart';
 import '../models/user_profile.dart';
 import '../data/meal_distribution.dart';
 import 'training_time_picker_screen.dart';
+
 class CycleEditorScreen extends StatefulWidget {
   final TrainingCycle cycle;
-  final List<MealTemplate> templates;
   final UserProfile? profile;
   final ValueChanged<TrainingCycle> onSave;
 
   const CycleEditorScreen({
     super.key,
     required this.cycle,
-    required this.templates,
     this.profile,
     required this.onSave,
   });
@@ -108,67 +106,6 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
     );
   }
 
-  void _pickTemplate(BuildContext context, CycleDay day) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('第${day.dayIndex + 1}天: ${day.label} — 选择配餐',
-                style:
-                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
-            const SizedBox(height: 16),
-            if (widget.templates.isEmpty)
-              const Center(
-                  child: Text('还没有配餐模板，先去配餐页面保存吧',
-                      style: TextStyle(color: Colors.grey)))
-            else ...[
-              RadioListTile<String?>(
-                title: const Text('不分配'),
-                value: null,
-                groupValue: day.mealTemplateId,
-                onChanged: (val) {
-                  setState(() {
-                    _cycle = _cycle.copyWith(
-                        days: _cycle.days.map((d) {
-                      if (d.dayIndex == day.dayIndex) {
-                        return d.copyWith(mealTemplateId: null);
-                      }
-                      return d;
-                    }).toList());
-                  });
-                  Navigator.pop(ctx);
-                },
-              ),
-              ...widget.templates.map((t) => RadioListTile<String>(
-                    title: Text(t.name),
-                    subtitle: Text(
-                        '目标 ${t.target.protein.toStringAsFixed(0)}P / ${t.target.carbs.toStringAsFixed(0)}C'),
-                    value: t.id,
-                    groupValue: day.mealTemplateId,
-                    onChanged: (val) {
-                      setState(() {
-                        _cycle = _cycle.copyWith(
-                            days: _cycle.days.map((d) {
-                          if (d.dayIndex == day.dayIndex) {
-                            return d.copyWith(mealTemplateId: val);
-                          }
-                          return d;
-                        }).toList());
-                      });
-                      Navigator.pop(ctx);
-                    },
-                  )),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   void _onReorder(int oldIndex, int newIndex) {
     setState(() {
       if (newIndex > oldIndex) newIndex -= 1;
@@ -233,11 +170,6 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
                       theme),
                   const SizedBox(width: 12),
                   _statChip(
-                      Icons.restaurant,
-                      '${_cycle.days.where((d) => d.mealTemplateId != null).length}天已分配',
-                      theme),
-                  const SizedBox(width: 12),
-                  _statChip(
                       Icons.bedtime,
                       '${_cycle.days.where((d) => d.isRestDay).length}休息日',
                       theme),
@@ -262,7 +194,7 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('点击修改标签/休息日 · 右侧选择配餐模板',
+          Text('点击修改标签/休息日',
               style: TextStyle(color: Colors.grey[400], fontSize: 13)),
           const SizedBox(height: 8),
 
@@ -279,15 +211,9 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
             ),
             itemBuilder: (context, index) {
               final day = _cycle.days[index];
-              final templateName = day.mealTemplateId != null
-                  ? widget.templates
-                      .where((t) => t.id == day.mealTemplateId)
-                      .firstOrNull
-                      ?.name
-                  : null;
 
               return Card(
-                key: ValueKey('day_${day.dayIndex}_${day.mealTemplateId}'),
+                key: ValueKey('day_$index'),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   contentPadding:
@@ -340,46 +266,17 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
                     ],
                   ),
                   subtitle: Text(
-                    templateName ?? '未分配配餐',
-                    style: TextStyle(
-                      color: templateName != null
-                          ? Colors.grey[400]
-                          : Colors.grey[600],
-                      fontSize: 13,
-                    ),
+                    day.isRestDay ? '休息日 · 使用休息日配餐' : '训练日 · 使用训练日配餐',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (day.mealTemplateId != null)
-                        IconButton(
-                          icon: const Icon(Icons.clear,
-                              size: 18, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              _cycle = _cycle.copyWith(
-                                  days: _cycle.days.map((d) {
-                                if (d.dayIndex == day.dayIndex)
-                                  return d.copyWith(mealTemplateId: null);
-                                return d;
-                              }).toList());
-                            });
-                          },
-                        ),
                       IconButton(
                         icon: Icon(Icons.edit_note,
                             size: 22, color: Colors.grey[500]),
                         onPressed: () => _editDay(context, day),
                         tooltip: '编辑日标签',
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.restaurant_menu,
-                            size: 20,
-                            color: day.mealTemplateId != null
-                                ? theme.colorScheme.primary
-                                : Colors.grey),
-                        onPressed: () => _pickTemplate(context, day),
-                        tooltip: '分配配餐',
                       ),
                     ],
                   ),
