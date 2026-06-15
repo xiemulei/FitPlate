@@ -91,20 +91,57 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
     });
   }
 
-  void _pickFood(int mealIdx) async {
-    final currentFoods = _meals[mealIdx].foods;
-    // 显示食物选择底部弹窗
+  bool _isCarbFood(String foodId) {
+    final food = widget.foods.where((f) => f.id == foodId).firstOrNull;
+    if (food == null) return false;
+    return food.category == FoodCategory.staple;
+  }
+
+  Widget _foodChip(FoodAssignment fa) {
+    final food = widget.foods.where((f) => f.id == fa.foodId).firstOrNull;
+    return Chip(
+      label: Text('${food?.name ?? "?"} ${fa.grams.round()}g',
+          style: const TextStyle(fontSize: 11)),
+      deleteIcon: const Icon(Icons.close, size: 14),
+      onDeleted: () => setState(() => _removeFood(fa.foodId)),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+
+  void _removeFood(String foodId) {
+    for (final m in _t.trainingMeals) {
+      m.foods.removeWhere((f) => f.foodId == foodId);
+    }
+    for (final m in _t.restMeals) {
+      m.foods.removeWhere((f) => f.foodId == foodId);
+    }
+  }
+
+  void _pickFoodForCategory(int mealIdx, bool isCarb) async {
+    final meal = _meals[mealIdx];
+    final filteredFoods = widget.foods.where((f) =>
+        isCarb ? f.category == FoodCategory.staple
+               : (f.category == FoodCategory.leanProtein ||
+                  f.category == FoodCategory.proteinPowder)
+    ).toList();
+    final currentOfCategory = meal.foods
+        .where((f) => _isCarbFood(f.foodId) == isCarb)
+        .toList();
+
     final result = await showModalBottomSheet<List<FoodAssignment>>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _FoodPickerSheet(
-        foods: widget.foods,
-        current: currentFoods,
+        foods: filteredFoods,
+        current: currentOfCategory,
       ),
     );
     if (result != null) {
       setState(() {
-        _meals[mealIdx].foods = result;
+        meal.foods.removeWhere((f) => _isCarbFood(f.foodId) == isCarb);
+        meal.foods.addAll(result);
       });
     }
   }
@@ -316,38 +353,72 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
             if (widget.profile != null)
               Text(_calcGrams(m),
                   style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-
-            // 已选食物
-            if (m.foods.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 4,
-                runSpacing: 2,
-                children: m.foods.map((fa) {
-                  final food = widget.foods.where((f) => f.id == fa.foodId).firstOrNull;
-                  return Chip(
-                    label: Text(food?.name ?? fa.foodId,
-                        style: const TextStyle(fontSize: 11)),
-                    deleteIcon: const Icon(Icons.close, size: 14),
-                    onDeleted: () {
-                      setState(() => m.foods.removeWhere((x) => x.foodId == fa.foodId));
-                    },
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  );
-                }).toList(),
-              ),
-            ],
             const SizedBox(height: 4),
+
+            // ── 碳水主食区 ──
+            Row(children: [
+              Icon(Icons.grain, size: 14, color: Colors.orange[600]),
+              const SizedBox(width: 4),
+              Text('碳水主食',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.orange[700])),
+            ]),
+            if (m.foods.where((f) => _isCarbFood(f.foodId)).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: m.foods
+                      .where((f) => _isCarbFood(f.foodId))
+                      .map((fa) => _foodChip(fa))
+                      .toList(),
+                ),
+              ),
             TextButton.icon(
-              onPressed: () => _pickFood(idx),
-              icon: Icon(Icons.restaurant_menu, size: 16,
-                  color: m.foods.isNotEmpty ? theme.colorScheme.primary : Colors.grey),
-              label: Text(m.foods.isNotEmpty ? '更换食物' : '选择食物',
-                  style: TextStyle(fontSize: 12)),
+              onPressed: () => _pickFoodForCategory(idx, true),
+              icon: Icon(Icons.add_circle_outline, size: 16, color: Colors.orange[700]),
+              label: Text('选碳水主食',
+                  style: TextStyle(fontSize: 12, color: Colors.orange[700])),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(height: 2),
+
+            // ── 蛋白质区 ──
+            Row(children: [
+              Icon(Icons.fitness_center, size: 14, color: Colors.green[600]),
+              const SizedBox(width: 4),
+              Text('蛋白质',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green[700])),
+            ]),
+            if (m.foods.where((f) => !_isCarbFood(f.foodId)).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: m.foods
+                      .where((f) => !_isCarbFood(f.foodId))
+                      .map((fa) => _foodChip(fa))
+                      .toList(),
+                ),
+              ),
+            TextButton.icon(
+              onPressed: () => _pickFoodForCategory(idx, false),
+              icon: Icon(Icons.add_circle_outline, size: 16, color: Colors.green[700]),
+              label: Text('选蛋白质',
+                  style: TextStyle(fontSize: 12, color: Colors.green[700])),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
