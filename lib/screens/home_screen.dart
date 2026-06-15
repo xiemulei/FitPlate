@@ -86,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       CycleScreen(
         cycles: _cycles,
         templates: _templates,
+        profile: _profile,
         onCyclesChanged: _onCyclesChanged,
       ),
       ProfileScreen(

@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../models/cycle.dart';
-
-/// 训练循环编辑器 — 独立页面编辑循环名称和各天的标签/配餐
+import '../models/user_profile.dart';
+import '../data/meal_distribution.dart';
+import 'training_time_picker_screen.dart';
 class CycleEditorScreen extends StatefulWidget {
   final TrainingCycle cycle;
   final List<MealTemplate> templates;
+  final UserProfile? profile;
   final ValueChanged<TrainingCycle> onSave;
 
   const CycleEditorScreen({
     super.key,
     required this.cycle,
     required this.templates,
+    this.profile,
     required this.onSave,
   });
 
@@ -242,6 +245,10 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // ── 配餐方案 ──
+          _buildTrainingTimeCard(theme),
           const SizedBox(height: 16),
 
           Row(
@@ -403,6 +410,181 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
         ],
       ),
     );
+  }
+
+  // ── 配餐方案卡 ──
+  Widget _buildTrainingTimeCard(ThemeData theme) {
+    final effectiveTime =
+        _cycle.trainingTime ?? widget.profile?.trainingTime;
+    if (effectiveTime == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            Icon(Icons.restaurant_menu,
+                color: theme.colorScheme.primary, size: 20),
+            const SizedBox(width: 10),
+            const Expanded(
+                child: Text('未设置配餐方案',
+                    style: TextStyle(fontWeight: FontWeight.w600))),
+            TextButton(
+              onPressed: _changeTrainingTime,
+              child: const Text('设置', style: TextStyle(fontSize: 13)),
+            ),
+          ]),
+        ),
+      );
+    }
+
+    final dist = MealDistributions.forTrainingTime(effectiveTime);
+    if (dist == null) return const SizedBox.shrink();
+
+    final profile = widget.profile;
+    final dailyCarbs =
+        profile != null ? profile.weight * profile.carbsPerKg : null;
+    final dailyProtein =
+        profile != null ? profile.weight * profile.proteinPerKg : null;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 头部
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            child: Row(
+              children: [
+                Text(effectiveTime.icon,
+                    style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('配餐方案: ${effectiveTime.label}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                ),
+                TextButton(
+                  onPressed: _changeTrainingTime,
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  child: const Text('换方案',
+                      style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          // 训练日
+          _mealPreviewGroup('🏋️ 训练日配餐', dist.trainingDayMeals,
+              dailyCarbs, dailyProtein, Colors.orange),
+          const Divider(height: 1, indent: 14, endIndent: 14),
+          // 休息日
+          _mealPreviewGroup('😴 休息日配餐', dist.restDayMeals,
+              dailyCarbs, dailyProtein, Colors.blue),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _mealPreviewGroup(String title, List<MealPortion> meals,
+      double? dailyCarbs, double? dailyProtein, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: accent)),
+          const SizedBox(height: 4),
+          ...meals.asMap().entries.map((e) {
+            final m = e.value;
+            final carbG = dailyCarbs != null
+                ? (dailyCarbs * m.carbRatio).round()
+                : null;
+            final proteinG = dailyProtein != null
+                ? (dailyProtein * m.proteinRatio).round()
+                : null;
+            final name =
+                m.name.replaceAll(RegExp(r'[①②③④⑤]'), '').trim();
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: Text(name,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  const Spacer(),
+                  if (carbG != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('C ${carbG}g',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange[800])),
+                    ),
+                  const SizedBox(width: 4),
+                  if (proteinG != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('P ${proteinG}g',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[800])),
+                    ),
+                  if (carbG == null)
+                    Text(
+                        '碳水${(m.carbRatio * 100).round()}% 蛋白${(m.proteinRatio * 100).round()}%',
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[500])),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _changeTrainingTime() async {
+    final effectiveTime =
+        _cycle.trainingTime ?? widget.profile?.trainingTime;
+    final result = await Navigator.push<TrainingTime>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrainingTimePickerScreen(
+          profile: widget.profile,
+          current: effectiveTime,
+        ),
+      ),
+    );
+    if (result != null && result != _cycle.trainingTime) {
+      setState(() {
+        _cycle = _cycle.copyWith(trainingTime: result);
+      });
+    }
   }
 
   Widget _statChip(IconData icon, String label, ThemeData theme) {

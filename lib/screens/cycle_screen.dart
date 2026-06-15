@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
+import '../models/user_profile.dart';
 import '../models/cycle.dart';
 import 'cycle_editor_screen.dart';
+import 'training_time_picker_screen.dart';
 
 class CycleScreen extends StatefulWidget {
   final List<TrainingCycle> cycles;
   final List<MealTemplate> templates;
+  final UserProfile? profile;
   final ValueChanged<List<TrainingCycle>> onCyclesChanged;
 
   const CycleScreen({
     super.key,
     required this.cycles,
     required this.templates,
+    this.profile,
     required this.onCyclesChanged,
   });
 
@@ -24,6 +28,9 @@ class _CycleScreenState extends State<CycleScreen> {
     final nameCtrl = TextEditingController();
     final lengthCtrl = TextEditingController(text: '4');
     String? selectedPreset;
+    // 训练时间方案：默认取 profile 的，否则用午饭后练
+    TrainingTime selectedTime =
+        widget.profile?.trainingTime ?? TrainingTime.afterLunch;
 
     showDialog(
       context: context,
@@ -96,6 +103,37 @@ class _CycleScreenState extends State<CycleScreen> {
                         ))
                     .toList(),
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('配餐方案',
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.grey[600])),
+                  const Spacer(),
+                  ActionChip(
+                    label: Text(selectedTime.label,
+                        style: const TextStyle(fontSize: 12)),
+                    avatar: Text(selectedTime.icon,
+                        style: const TextStyle(fontSize: 14)),
+                    onPressed: () async {
+                      final result = await Navigator.push<TrainingTime>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TrainingTimePickerScreen(
+                            profile: widget.profile,
+                            current: selectedTime,
+                          ),
+                        ),
+                      );
+                      if (result != null) {
+                        setDialogState(() => selectedTime = result);
+                      }
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
           actions: [
@@ -138,6 +176,7 @@ class _CycleScreenState extends State<CycleScreen> {
                     days: days,
                     startDate: DateTime.now().toIso8601String().split('T')[0],
                     isActive: widget.cycles.isEmpty,
+                    trainingTime: selectedTime,
                   );
 
                   widget.onCyclesChanged([...widget.cycles, cycle]);
@@ -157,6 +196,7 @@ class _CycleScreenState extends State<CycleScreen> {
           builder: (_) => CycleEditorScreen(
             cycle: cycle,
             templates: widget.templates,
+            profile: widget.profile,
             onSave: (updated) {
               widget.onCyclesChanged(widget.cycles
                   .map((c) => c.id == updated.id ? updated : c)
