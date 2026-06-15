@@ -3,6 +3,7 @@ import '../models/food.dart';
 import '../models/user_profile.dart';
 import '../data/meal_distribution.dart';
 import '../utils/meal_utils.dart';
+import 'training_time_picker_screen.dart';
 
 class MealPlannerScreen extends StatefulWidget {
   final List<Food> foods;
@@ -187,10 +188,51 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
             ]),
           ),
           const SizedBox(height: 12),
-        ],
 
-        // Meal type chips
-        Text('选择餐次',
+        // ── 配餐方案卡片 ──
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TrainingTimePickerScreen(
+                    profile: profile,
+                    current: profile.trainingTime,
+                  ),
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(children: [
+                Text(profile.trainingTime.icon,
+                    style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('配餐方案: ${profile.trainingTime.label}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text(profile.trainingTime.dietDescription,
+                            style: TextStyle(
+                                color: Colors.grey[500], fontSize: 12)),
+                      ]),
+                ),
+                Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+
+      // Meal type chips
+      Text('选择餐次',
             style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey)),
         const SizedBox(height: 8),
         SizedBox(
