@@ -576,30 +576,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onSelectionChanged: (set) => _onGoalChanged(set.first),
                       ),
                       const SizedBox(height: 16),
-                      Text('训练时间',
-                          style:
-                              TextStyle(color: Colors.grey[400], fontSize: 13)),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: TrainingTime.values
-                            .map((t) => ChoiceChip(
-                                  label: Text('${t.icon} ${t.label}',
-                                      style: const TextStyle(fontSize: 13)),
-                                  selected: p.trainingTime == t,
-                                  onSelected: (_) {
-                                    setState(() => p.trainingTime = t);
-                                    _save();
-                                  },
-                                ))
-                            .toList(),
-                      ),
-                      if (p.goal == FitnessGoal.fatLoss) ...[
-                        const SizedBox(height: 12),
+                      // ── 力量训练开关（放在训练时间上方） ──
+                      if (p.goal == FitnessGoal.fatLoss)
                         SwitchListTile(
                           title: const Text('不做力量训练（纯饮食控制）',
                               style: TextStyle(fontSize: 14)),
+                          subtitle: Text(
+                            p.noStrengthTraining ? '无训练时间概念' : '需选择训练时段',
+                            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          ),
                           value: p.noStrengthTraining,
                           onChanged: (v) {
                             setState(() => p.noStrengthTraining = v);
@@ -608,6 +593,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           },
                           contentPadding: EdgeInsets.zero,
                           dense: true,
+                        ),
+                      // ── 训练时间（仅力量训练时显示） ──
+                      if (!p.noStrengthTraining) ...[
+                        const SizedBox(height: 8),
+                        Text('训练时间',
+                            style: TextStyle(
+                                color: Colors.grey[400], fontSize: 13)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: TrainingTime.values
+                              .map((t) => ChoiceChip(
+                                    label: Text('${t.icon} ${t.label}',
+                                        style: const TextStyle(fontSize: 13)),
+                                    selected: p.trainingTime == t,
+                                    onSelected: (_) {
+                                      setState(() => p.trainingTime = t);
+                                      _save();
+                                    },
+                                  ))
+                              .toList(),
                         ),
                       ],
                     ]))),
