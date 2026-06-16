@@ -912,17 +912,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: '${_calcDailyRestCarbs().toStringAsFixed(0)}g',
                           color: theme.colorScheme.onPrimaryContainer),
                     ],
-                    Container(
-                        height: 50,
-                        width: 1,
-                        color: theme.colorScheme.onPrimaryContainer
-                            .withValues(alpha: 0.2)),
-                    NutrientColumn(
-                        icon: Icons.local_fire_department,
-                        label: '卡路里',
-                        value: _calcDailyCalories().toStringAsFixed(0),
-                        color: theme.colorScheme.onPrimaryContainer),
-                  ]),
+                    ]),
                 ]))),
         const SizedBox(height: 12),
 
@@ -1018,8 +1008,5 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
     return w * rck;
   }
-
-  double _calcDailyCalories() =>
-      _calcDailyProtein() * 4 + _calcDailyCarbs() * 4;
 }
 
