@@ -45,10 +45,9 @@ class TrainingTimePickerScreen extends StatelessWidget {
     final desc = dist.trainingTime.dietDescription;
 
     // 计算实际克数（如果 profile 可用）
-    final double? dailyCarbs = profile != null ? profile!.dailyCarbs : null;
-    final double? dailyRestCarbs = profile != null ? profile!.dailyRestCarbs : null;
-    final double? dailyProtein =
-        profile != null ? profile!.dailyProtein : null;
+    final double? dailyCarbs = profile?.dailyCarbs;
+    final double? dailyRestCarbs = profile?.dailyRestCarbs;
+    final double? dailyProtein = profile?.dailyProtein;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

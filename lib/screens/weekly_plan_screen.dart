@@ -93,8 +93,9 @@ class _WeeklyPlanScreenState extends State<WeeklyPlanScreen> {
               },
               onSlotsChanged: (slots) {
                 final updated = widget.plans.map((p) {
-                  if (p.id == plan.id)
+                  if (p.id == plan.id) {
                     return WeeklyPlan(id: p.id, name: p.name, slots: slots);
+                  }
                   return p;
                 }).toList();
                 widget.onPlansChanged(updated);
@@ -182,22 +183,29 @@ class _PlanCard extends StatelessWidget {
                 style:
                     const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
             const SizedBox(height: 16),
-            ...templates.map((t) => RadioListTile<String>(
-                  title: Text(t.name),
-                  value: t.id,
-                  groupValue: current.templateId,
-                  onChanged: (val) {
-                    final slots = plan.slots
-                        .where((s) => !(s.day == day && s.meal == meal))
-                        .toList();
-                    if (val != null && val.isNotEmpty) {
-                      slots
-                          .add(PlanSlot(day: day, meal: meal, templateId: val));
-                    }
-                    onSlotsChanged(slots);
-                    Navigator.pop(ctx);
-                  },
-                )),
+            if (templates.isNotEmpty)
+              RadioGroup<String>(
+                groupValue: current.templateId,
+                onChanged: (val) {
+                  final slots = plan.slots
+                      .where((s) => !(s.day == day && s.meal == meal))
+                      .toList();
+                  if (val != null && val.isNotEmpty) {
+                    slots.add(
+                        PlanSlot(day: day, meal: meal, templateId: val));
+                  }
+                  onSlotsChanged(slots);
+                  Navigator.pop(ctx);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: templates.map((t) => RadioListTile<String>(
+                        title: Text(t.name),
+                        value: t.id,
+                      )).toList(),
+                ),
+              ),
             if (templates.isEmpty)
               const Center(
                   child: Text('还没有配餐模板，先去计算结果页面保存吧',

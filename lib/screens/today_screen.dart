@@ -582,8 +582,9 @@ class _TodayScreenState extends State<TodayScreen> {
                       child: Text(f.name, style: const TextStyle(fontSize: 12)),
                     )).toList(),
                 onChanged: (fid) {
-                  if (fid != null)
+                  if (fid != null) {
                     _changeFood(mealIdx, idx, fid, isCarb);
+                  }
                 },
               ),
             ),

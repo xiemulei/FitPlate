@@ -170,7 +170,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 
           // 计量单位选择
           DropdownButtonFormField<FoodUnit>(
-            value: _unit,
+            initialValue: _unit,
             decoration: const InputDecoration(
               labelText: '计量单位',
               border: OutlineInputBorder(),
@@ -214,7 +214,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 
           // 分类选择
           DropdownButtonFormField<String>(
-            value: _category,
+            initialValue: _category,
             decoration: const InputDecoration(
               labelText: '分类',
               border: OutlineInputBorder(),
@@ -237,7 +237,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
           // 子分类（主食专用）
           if (_category == FoodCategory.staple)
             DropdownButtonFormField<String>(
-              value: _subcategory,
+              initialValue: _subcategory,
               decoration: const InputDecoration(
                 labelText: '子分类',
                 hintText: '选择子分类',
@@ -355,11 +355,11 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   Color _categoryColor(ThemeData theme) {
     switch (_category) {
       case FoodCategory.staple:
-        return Colors.orange.withOpacity(0.3);
+        return Colors.orange.withValues(alpha: 0.3);
       case FoodCategory.leanProtein:
-        return Colors.red.withOpacity(0.3);
+        return Colors.red.withValues(alpha: 0.3);
       case FoodCategory.proteinPowder:
-        return Colors.purple.withOpacity(0.3);
+        return Colors.purple.withValues(alpha: 0.3);
       default:
         return theme.colorScheme.primaryContainer;
     }

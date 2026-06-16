@@ -70,7 +70,8 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
                 subtitle: Text(isRestDay ? '这天不用训练' : '训练日',
                     style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                 value: isRestDay,
-                activeColor: Colors.orange,
+                activeTrackColor: Colors.orange.withValues(alpha: 0.3),
+                activeThumbColor: Colors.orange,
                 onChanged: (v) => setDialogState(() => isRestDay = v),
                 contentPadding: EdgeInsets.zero,
               ),
@@ -106,9 +107,8 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
     );
   }
 
-  void _onReorder(int oldIndex, int newIndex) {
+  void _onReorderItem(int oldIndex, int newIndex) {
     setState(() {
-      if (newIndex > oldIndex) newIndex -= 1;
       final updated = List<CycleDay>.from(_cycle.days);
       final item = updated.removeAt(oldIndex);
       updated.insert(
@@ -203,7 +203,7 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _cycle.days.length,
-            onReorder: _onReorder,
+            onReorderItem: _onReorderItem,
             proxyDecorator: (child, index, animation) => Material(
               elevation: 4,
               borderRadius: BorderRadius.circular(12),
