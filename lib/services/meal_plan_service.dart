@@ -65,18 +65,19 @@ class MealPlanService {
         : MealDistributions.noStrengthMeals;
 
     for (final portion in meals) {
-      entries.add(_toEntry(portion, profile));
+      entries.add(_toEntry(portion, profile, isRestDay: isRestDay));
     }
     return entries;
   }
 
-  static MealPlanEntry _toEntry(MealPortion portion, UserProfile profile) {
+  static MealPlanEntry _toEntry(MealPortion portion, UserProfile profile, {bool isRestDay = false}) {
     final label = portion.name.replaceAll(RegExp(r'[①②③④⑤]'), '').trim();
+    final dailyCarbs = isRestDay ? profile.dailyRestCarbs : profile.dailyCarbs;
     return MealPlanEntry(
       type: _matchMealType(portion.name),
       label: label,
       proteinG: (profile.dailyProtein * portion.proteinRatio).round(),
-      carbsG: (profile.dailyCarbs * portion.carbRatio).round(),
+      carbsG: (dailyCarbs * portion.carbRatio).round(),
     );
   }
 

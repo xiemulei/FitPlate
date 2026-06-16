@@ -29,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _ageCtrl;
   late TextEditingController _proteinKgCtrl;
   late TextEditingController _carbsKgCtrl;
+  late TextEditingController _restCarbsKgCtrl;
 
   // 标记用户是否手动调整过每千克值（切换目标时不覆盖）
   bool _userTweakedProtein = false;
@@ -36,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 查表推荐状态
   String? _recommendationNote;
-  (double, double)? _recommendedFactor; // ($1=carbsPerKg, $2=proteinPerKg)
+  (double, double, double)? _recommendedFactor; // (trainCarbs, restCarbs, protein)
   bool _hasAppliedRecommendation = false;
 
   @override
@@ -49,6 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _proteinKgCtrl =
         TextEditingController(text: p.proteinPerKg.toStringAsFixed(1));
     _carbsKgCtrl = TextEditingController(text: p.carbsPerKg.toStringAsFixed(1));
+    _restCarbsKgCtrl =
+        TextEditingController(text: p.restCarbsPerKg.toStringAsFixed(1));
     // 页面恢复时自动查表推荐
     _lookupRecommendation();
   }
@@ -60,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _ageCtrl.dispose();
     _proteinKgCtrl.dispose();
     _carbsKgCtrl.dispose();
+    _restCarbsKgCtrl.dispose();
     super.dispose();
   }
 
@@ -70,11 +74,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final pk =
         double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
     final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
+    final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
     widget.profile.height = h;
     widget.profile.weight = w;
     widget.profile.age = a;
     widget.profile.proteinPerKg = pk;
     widget.profile.carbsPerKg = ck;
+    widget.profile.restCarbsPerKg = rck;
     widget.onProfileChanged(widget.profile);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('个人资料已保存')),
@@ -92,6 +98,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!_userTweakedCarbs) {
         widget.profile.carbsPerKg = UserProfile.defaultCarbsPerKg(newGoal);
         _carbsKgCtrl.text = widget.profile.carbsPerKg.toStringAsFixed(1);
+        widget.profile.restCarbsPerKg = UserProfile.defaultCarbsPerKg(newGoal);
+        _restCarbsKgCtrl.text = widget.profile.restCarbsPerKg.toStringAsFixed(1);
       }
     });
     _save();
@@ -131,10 +139,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _applyRecommendation() {
     if (_recommendedFactor == null) return;
     final p = widget.profile;
-    p.proteinPerKg = _recommendedFactor!.$2;
+    p.proteinPerKg = _recommendedFactor!.$3;
     p.carbsPerKg = _recommendedFactor!.$1;
+    p.restCarbsPerKg = _recommendedFactor!.$2;
     _proteinKgCtrl.text = p.proteinPerKg.toStringAsFixed(1);
     _carbsKgCtrl.text = p.carbsPerKg.toStringAsFixed(1);
+    _restCarbsKgCtrl.text = p.restCarbsPerKg.toStringAsFixed(1);
     _hasAppliedRecommendation = true;
     _userTweakedProtein = false;
     _userTweakedCarbs = false;
@@ -635,51 +645,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: TextStyle(color: Colors.grey[400], fontSize: 12),
                       ),
                       const SizedBox(height: 14),
-                      Row(children: [
-                        Expanded(
-                            child: TextField(
-                          controller: _proteinKgCtrl,
-                          decoration: const InputDecoration(
-                            labelText: '蛋白质 (g/kg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.fitness_center),
-                            isDense: true,
-                            helperText: '调节后自动计算',
-                            helperStyle: TextStyle(fontSize: 11),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          onChanged: (_) {
-                            _userTweakedProtein = true;
-                            if (_hasAppliedRecommendation) {
-                              _hasAppliedRecommendation = false;
-                            }
-                            setState(() {});
-                          },
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: TextField(
-                          controller: _carbsKgCtrl,
-                          decoration: const InputDecoration(
-                            labelText: '碳水 (g/kg)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.grain),
-                            isDense: true,
-                            helperText: '调节后自动计算',
-                            helperStyle: TextStyle(fontSize: 11),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
-                          onChanged: (_) {
-                            _userTweakedCarbs = true;
-                            if (_hasAppliedRecommendation) {
-                              _hasAppliedRecommendation = false;
-                            }
-                            setState(() {});
-                          },
-                        )),
-                      ]),
+                      // 蛋白质 + 训练日碳水 + (可选)休息日碳水
+                      if (!widget.profile.noStrengthTraining) ...[
+                        // 有力量训练 → 显示三列
+                        Row(children: [
+                          Expanded(
+                              child: TextField(
+                            controller: _proteinKgCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '蛋白质 (g/kg)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.fitness_center),
+                              isDense: true,
+                              helperText: '训练日/休息日',
+                              helperStyle: TextStyle(fontSize: 11),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) {
+                              _userTweakedProtein = true;
+                              if (_hasAppliedRecommendation) {
+                                _hasAppliedRecommendation = false;
+                              }
+                              setState(() {});
+                            },
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: TextField(
+                            controller: _carbsKgCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '碳水·训 (g/kg)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.flash_on),
+                              isDense: true,
+                              helperText: '训练日',
+                              helperStyle: TextStyle(fontSize: 11),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) {
+                              _userTweakedCarbs = true;
+                              if (_hasAppliedRecommendation) {
+                                _hasAppliedRecommendation = false;
+                              }
+                              setState(() {});
+                            },
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: TextField(
+                            controller: _restCarbsKgCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '碳水·休 (g/kg)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.bedtime),
+                              isDense: true,
+                              helperText: '休息日',
+                              helperStyle: TextStyle(fontSize: 11),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) {
+                              _userTweakedCarbs = true;
+                              if (_hasAppliedRecommendation) {
+                                _hasAppliedRecommendation = false;
+                              }
+                              setState(() {});
+                            },
+                          )),
+                        ]),
+                      ] else ...[
+                        // 无力训 → 显示两列
+                        Row(children: [
+                          Expanded(
+                              child: TextField(
+                            controller: _proteinKgCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '蛋白质 (g/kg)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.fitness_center),
+                              isDense: true,
+                              helperText: '调节后自动计算',
+                              helperStyle: TextStyle(fontSize: 11),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) {
+                              _userTweakedProtein = true;
+                              if (_hasAppliedRecommendation) {
+                                _hasAppliedRecommendation = false;
+                              }
+                              setState(() {});
+                            },
+                          )),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: TextField(
+                            controller: _carbsKgCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '碳水 (g/kg)',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.grain),
+                              isDense: true,
+                              helperText: '调节后自动计算',
+                              helperStyle: TextStyle(fontSize: 11),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            onChanged: (_) {
+                              _userTweakedCarbs = true;
+                              if (_hasAppliedRecommendation) {
+                                _hasAppliedRecommendation = false;
+                              }
+                              setState(() {});
+                            },
+                          )),
+                        ]),
+                      ],
                       // 查表推荐提示
                       if (_recommendationNote != null) ...[
                         const SizedBox(height: 12),
@@ -813,10 +896,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: theme.colorScheme.onPrimaryContainer
                             .withValues(alpha: 0.2)),
                     NutrientColumn(
-                        icon: Icons.grain,
-                        label: '碳水',
+                        icon: Icons.flash_on,
+                        label: '碳水·训',
                         value: '${_calcDailyCarbs().toStringAsFixed(0)}g',
                         color: theme.colorScheme.onPrimaryContainer),
+                    if (!widget.profile.noStrengthTraining) ...[
+                      Container(
+                          height: 50,
+                          width: 1,
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.2)),
+                      NutrientColumn(
+                          icon: Icons.bedtime,
+                          label: '碳水·休',
+                          value: '${_calcDailyRestCarbs().toStringAsFixed(0)}g',
+                          color: theme.colorScheme.onPrimaryContainer),
+                    ],
                     Container(
                         height: 50,
                         width: 1,
@@ -845,7 +940,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         p.goal == FitnessGoal.fatLoss
                             ? _hasAppliedRecommendation
-                                ? '减脂期（纯饮食控制），基于身高${p.height.toStringAsFixed(0)}cm / 体重${p.weight.toStringAsFixed(0)}kg / ${p.gender == Gender.male ? "男" : "女"} 的参考表推荐：蛋白质 ${p.proteinPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyProtein().toStringAsFixed(0)} g），碳水 ${p.carbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyCarbs().toStringAsFixed(0)} g）。'
+                                ? '减脂期（纯饮食控制），基于身高${p.height.toStringAsFixed(0)}cm / 体重${p.weight.toStringAsFixed(0)}kg / ${p.gender == Gender.male ? "男" : "女"} 的参考表推荐：蛋白质 ${p.proteinPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyProtein().toStringAsFixed(0)} g），训练日碳水 ${p.carbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyCarbs().toStringAsFixed(0)} g），休息日碳水 ${p.restCarbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyRestCarbs().toStringAsFixed(0)} g）。'
                                 : '减脂期高蛋白摄入（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）有助于保留肌肉，适量碳水维持训练表现。'
                             : '增肌期适量蛋白（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）配合充足碳水为训练供能，促进肌肉合成。',
                         style: TextStyle(color: Colors.grey[400], fontSize: 13),
@@ -916,6 +1011,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
     final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
     return w * ck;
+  }
+
+  double _calcDailyRestCarbs() {
+    final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
+    final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
+    return w * rck;
   }
 
   double _calcDailyCalories() =>

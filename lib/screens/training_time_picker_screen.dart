@@ -46,6 +46,7 @@ class TrainingTimePickerScreen extends StatelessWidget {
 
     // 计算实际克数（如果 profile 可用）
     final double? dailyCarbs = profile != null ? profile!.dailyCarbs : null;
+    final double? dailyRestCarbs = profile != null ? profile!.dailyRestCarbs : null;
     final double? dailyProtein =
         profile != null ? profile!.dailyProtein : null;
 
@@ -112,7 +113,7 @@ class TrainingTimePickerScreen extends StatelessWidget {
           const Divider(height: 1, indent: 14, endIndent: 14),
           // ── 休息日配餐 ──
           _mealSection('😴 休息日配餐', dist.restDayMeals,
-              dailyCarbs, dailyProtein, Colors.blue),
+              dailyRestCarbs, dailyProtein, Colors.blue),
 
           // ── 选择按钮 ──
           Padding(

@@ -140,7 +140,7 @@ class MealPlanTemplate {
   /// 根据个人资料计算各餐实际克数（休息日）
   List<({String name, double carbG, double proteinG})> calcRestDay(
       UserProfile profile) {
-    final dc = profile.dailyCarbs;
+    final dc = profile.dailyRestCarbs;
     final dp = profile.dailyProtein;
     return restMeals.map((m) => (
       name: m.name,

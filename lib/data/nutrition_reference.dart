@@ -724,10 +724,10 @@ class NutritionReference {
     throw ArgumentError('Unexpected factor type: ${val.runtimeType}');
   }
 
-  /// 获取推荐因子（使用训练日碳水和蛋白质）
+  /// 获取推荐因子（训练日碳水 + 休息日碳水 + 蛋白质）
   ///
-  /// 返回 (carbsPerKg, proteinPerKg) 或 null（无匹配）。
-  static (double carbsPerKg, double proteinPerKg)? lookupRecommended({
+  /// 返回 (trainCarbsPerKg, restCarbsPerKg, proteinPerKg) 或 null（无匹配）。
+  static (double trainCarbsPerKg, double restCarbsPerKg, double proteinPerKg)? lookupRecommended({
     required bool isMale,
     required int heightCm,
     required int weightKg,
@@ -742,8 +742,7 @@ class NutritionReference {
       goal: goal,
     );
     if (result == null) return null;
-    // 使用训练日碳水和蛋白质
-    return (result.$1, result.$3);
+    return (result.$1, result.$2, result.$3);
   }
 
   /// 获取推荐说明文字

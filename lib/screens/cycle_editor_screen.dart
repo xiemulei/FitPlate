@@ -339,6 +339,8 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
     final profile = widget.profile;
     final dailyCarbs =
         profile != null ? profile.weight * profile.carbsPerKg : null;
+    final dailyRestCarbs =
+        profile != null ? profile.weight * profile.restCarbsPerKg : null;
     final dailyProtein =
         profile != null ? profile.weight * profile.proteinPerKg : null;
 
@@ -380,7 +382,7 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
           const Divider(height: 1, indent: 14, endIndent: 14),
           // 休息日
           _mealPreviewGroup('😴 休息日配餐', dist.restDayMeals,
-              dailyCarbs, dailyProtein, Colors.blue),
+              dailyRestCarbs, dailyProtein, Colors.blue),
           const SizedBox(height: 8),
         ],
       ),

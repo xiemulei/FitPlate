@@ -101,7 +101,8 @@ class UserProfile {
 
   // 可自定义的每千克摄入量
   double proteinPerKg;
-  double carbsPerKg;
+  double carbsPerKg;        // 训练日碳水系数
+  double restCarbsPerKg;    // 休息日碳水系数
 
   UserProfile({
     this.height = 170,
@@ -113,8 +114,10 @@ class UserProfile {
     this.noStrengthTraining = false,
     double? proteinPerKg,
     double? carbsPerKg,
+    double? restCarbsPerKg,
   })  : proteinPerKg = proteinPerKg ?? defaultProteinPerKg(goal),
-        carbsPerKg = carbsPerKg ?? defaultCarbsPerKg(goal);
+        carbsPerKg = carbsPerKg ?? defaultCarbsPerKg(goal),
+        restCarbsPerKg = restCarbsPerKg ?? carbsPerKg ?? defaultCarbsPerKg(goal);
 
   static double defaultProteinPerKg(FitnessGoal g) =>
       g == FitnessGoal.fatLoss ? 2.0 : 1.8;
@@ -130,6 +133,7 @@ class UserProfile {
 
   double get dailyProtein => weight * proteinPerKg;
   double get dailyCarbs => weight * carbsPerKg;
+  double get dailyRestCarbs => weight * restCarbsPerKg;
   double get dailyCalories => dailyProtein * 4 + dailyCarbs * 4;
 
   bool get showNoStrengthOption => goal == FitnessGoal.fatLoss;
@@ -144,6 +148,7 @@ class UserProfile {
     bool? noStrengthTraining,
     double? proteinPerKg,
     double? carbsPerKg,
+    double? restCarbsPerKg,
   }) =>
       UserProfile(
         height: height ?? this.height,
@@ -155,6 +160,7 @@ class UserProfile {
         noStrengthTraining: noStrengthTraining ?? this.noStrengthTraining,
         proteinPerKg: proteinPerKg ?? this.proteinPerKg,
         carbsPerKg: carbsPerKg ?? this.carbsPerKg,
+        restCarbsPerKg: restCarbsPerKg ?? this.restCarbsPerKg,
       );
 
   Map<String, dynamic> toJson() => {
@@ -167,6 +173,7 @@ class UserProfile {
         'noStrengthTraining': noStrengthTraining,
         'proteinPerKg': proteinPerKg,
         'carbsPerKg': carbsPerKg,
+        'restCarbsPerKg': restCarbsPerKg,
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
@@ -184,5 +191,6 @@ class UserProfile {
         noStrengthTraining: (j['noStrengthTraining'] as bool?) ?? false,
         proteinPerKg: (j['proteinPerKg'] as num?)?.toDouble(),
         carbsPerKg: (j['carbsPerKg'] as num?)?.toDouble(),
+        restCarbsPerKg: (j['restCarbsPerKg'] as num?)?.toDouble(),
       );
 }
