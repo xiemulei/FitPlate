@@ -3,7 +3,7 @@ import '../models/user_profile.dart';
 import '../models/food.dart';
 import '../data/nutrition_reference.dart';
 import '../widgets/nutrient_display.dart';
-import 'template_list_screen.dart';
+import 'nutrition_reference_sheet.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserProfile profile;
@@ -54,6 +54,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
         TextEditingController(text: p.restCarbsPerKg.toStringAsFixed(1));
     // 页面恢复时自动查表推荐
     _lookupRecommendation();
+  }
+
+  @override
+  void didUpdateWidget(ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile != widget.profile) {
+      final p = widget.profile;
+      _heightCtrl.text = p.height.toStringAsFixed(0);
+      _weightCtrl.text = p.weight.toStringAsFixed(1);
+      _ageCtrl.text = p.age.toString();
+      _proteinKgCtrl.text = p.proteinPerKg.toStringAsFixed(1);
+      _carbsKgCtrl.text = p.carbsPerKg.toStringAsFixed(1);
+      _restCarbsKgCtrl.text = p.restCarbsPerKg.toStringAsFixed(1);
+      _userTweakedProtein = false;
+      _userTweakedCarbs = false;
+      _hasAppliedRecommendation = false;
+      _lookupRecommendation();
+    }
   }
 
   @override
@@ -149,314 +167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _userTweakedProtein = false;
     _userTweakedCarbs = false;
     setState(() {});
+    _save();
   }
 
-  void _showRefTable() {
-    final p = widget.profile;
-    final isMale = p.gender == Gender.male;
-    final isStrengthTraining = !p.noStrengthTraining;
-    final goal = p.goal;
-    final currentHeight = p.height.round();
-    final currentWeight = p.weight.round();
-
-    final table = NutritionReference.getFullTable(
-      isMale: isMale,
-      isStrengthTraining: isStrengthTraining,
-      goal: goal,
-    );
-    if (table.isEmpty) return;
-
-    final heights = table.keys.toList()..sort();
-    final allWeights = <int>{};
-    for (final h in heights) {
-      allWeights.addAll(table[h]!.keys);
-    }
-    final weights = allWeights.toList()..sort();
-
-    final title = NutritionReference.scenarioTitle(
-      isMale: isMale,
-      isStrengthTraining: isStrengthTraining,
-      goal: goal,
-    );
-
-    // 有力量训练 → 显示 训碳/休碳/蛋白；无力量训练 → 显示 碳水/蛋白
-    final subtitle = isStrengthTraining
-        ? '每格 = 训练日碳水 / 休息日碳水 / 蛋白质 (g/kg)'
-        : '每格 = 碳水 / 蛋白质 (g/kg)';
-    const cellW = 56.0;
-    const labelW = 44.0;
-    final rowH = isStrengthTraining ? 58.0 : 48.0;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final totalWidth = labelW + weights.length * cellW;
-
-        return SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.78,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Column(children: [
-              // ── 拖拽指示条 ──
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // ── 标题 ──
-              Row(children: [
-                Expanded(
-                  child: Text(title,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ]),
-              Text(subtitle,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12)),
-              const SizedBox(height: 12),
-              // ── 可双向滚动的矩阵 ──
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: totalWidth,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.vertical,
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ═══ 表头行 ═══
-                            Container(
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(8)),
-                              ),
-                              child: Row(children: [
-                                SizedBox(
-                                  width: labelW,
-                                  child: Center(
-                                    child: Text('身高↓',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
-                                  ),
-                                ),
-                                ...weights.map((w) => SizedBox(
-                                      width: cellW,
-                                      child: Center(
-                                        child: Text('$w',
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600)),
-                                      ),
-                                    )),
-                              ]),
-                            ),
-                            // ═══ 数据行 ═══
-                            ...heights.map((h) {
-                              final isHCur = h == currentHeight;
-                              return Container(
-                                height: rowH,
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                      bottom: BorderSide(
-                                          color: Colors.grey
-                                              .withValues(alpha: 0.12))),
-                                ),
-                                child: Row(children: [
-                                  // 身高标签
-                                  SizedBox(
-                                    width: labelW,
-                                    child: Container(
-                                      color: isHCur
-                                          ? theme.colorScheme.primaryContainer
-                                              .withValues(alpha: 0.3)
-                                          : null,
-                                      child: Center(
-                                        child: Text('$h',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: isHCur
-                                                  ? FontWeight.w700
-                                                  : FontWeight.normal,
-                                            )),
-                                      ),
-                                    ),
-                                  ),
-                                  // 各体重列
-                                  ...weights.map((w) {
-                                    final val = table[h]?[w];
-                                    final isCur =
-                                        isHCur && w == currentWeight;
-                                    return Container(
-                                      width: cellW,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: isCur
-                                            ? theme
-                                                .colorScheme.primary
-                                                .withValues(alpha: 0.15)
-                                            : (val != null
-                                                ? Colors.transparent
-                                                : Colors.grey
-                                                    .withValues(alpha: 0.04)),
-                                        border: Border(
-                                          left: BorderSide(
-                                              color: Colors.grey
-                                                  .withValues(alpha: 0.12)),
-                                        ),
-                                      ),
-                                      child: val != null
-                                          ? _buildCellContent(
-                                              isStrengthTraining,
-                                              val,
-                                              isCur,
-                                              theme,
-                                            )
-                                          : Center(
-                                              child: Text('-',
-                                                  style: TextStyle(
-                                                      fontSize: 11,
-                                                      color:
-                                                          Colors.grey[400])),
-                                            ),
-                                    );
-                                  }),
-                                ]),
-                              );
-                            }),
-                            // ═══ 底部圆角 ═══
-                            Container(
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface,
-                                borderRadius: const BorderRadius.vertical(
-                                    bottom: Radius.circular(8)),
-                              ),
-                            ),
-                            // ═══ 图例 ═══
-                            const SizedBox(height: 8),
-                            Row(children: [
-                              _legendDot(theme.colorScheme.primary
-                                  .withValues(alpha: 0.15)),
-                              const SizedBox(width: 4),
-                              Text('= 当前位置',
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[500])),
-                              const SizedBox(width: 16),
-                              _legendDot(
-                                  Colors.grey.withValues(alpha: 0.04)),
-                              const SizedBox(width: 4),
-                              Text('= 无数据',
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[500])),
-                            ]),
-                          ]),
-                    ),
-                  ),
-                ),
-              ),
-            ]),
-          ),
-        );
-      },
-    );
-  }
-
-  /// 根据是否有力量训练构建不同格式的单元格内容
-  Widget _buildCellContent(
-    bool isStrengthTraining,
-    (double, double, double) val,
-    bool isCurrent,
-    ThemeData theme,
-  ) {
-    // val = (carb1, carb2, protein)
-    //   无力训：carb1 = carb2 = 每日碳水
-    //   健身：  carb1 = 训练日碳水, carb2 = 休息日碳水
-    if (isStrengthTraining) {
-      // 3行：训练日碳水 / 休息日碳水 / 蛋白质
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(val.$1.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                color: isCurrent ? theme.colorScheme.primary : null,
-                height: 1.2,
-              )),
-          Text(val.$2.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-                color: isCurrent
-                    ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                    : Colors.grey[500],
-                height: 1.3,
-              )),
-          Text(val.$3.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                color: isCurrent ? theme.colorScheme.primary : null,
-                height: 1.2,
-              )),
-        ],
-      );
-    } else {
-      // 2行：碳水 / 蛋白质
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(val.$1.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                color: isCurrent ? theme.colorScheme.primary : null,
-                height: 1.2,
-              )),
-          Text(val.$3.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-                color: isCurrent
-                    ? theme.colorScheme.primary.withValues(alpha: 0.7)
-                    : Colors.grey[500],
-                height: 1.2,
-              )),
-        ],
-      );
-    }
-  }
-
-  Widget _legendDot(Color color) {
-    return Container(width: 12, height: 12, decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(2),
-      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-    ));
-  }
+  void _showRefTable() =>
+      NutritionReferenceSheet.show(context, widget.profile);
 
   @override
   Widget build(BuildContext context) {
@@ -502,7 +217,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     labelText: '身高 (cm)',
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.height)),
-                                keyboardType: TextInputType.number)),
+                                keyboardType: TextInputType.number,
+                                onChanged: (_) => _save())),
                         const SizedBox(width: 12),
                         Expanded(
                             child: TextField(
@@ -511,7 +227,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     labelText: '体重 (kg)',
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.monitor_weight)),
-                                keyboardType: TextInputType.number)),
+                                keyboardType: TextInputType.number,
+                                onChanged: (_) => _save())),
                       ]),
                       const SizedBox(height: 12),
                       TextField(
@@ -520,7 +237,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               labelText: '年龄',
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.cake)),
-                          keyboardType: TextInputType.number),
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => _save()),
                     ]))),
         const SizedBox(height: 12),
 
@@ -576,7 +294,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onSelectionChanged: (set) => _onGoalChanged(set.first),
                       ),
                       const SizedBox(height: 16),
-                      // ── 力量训练开关（放在训练时间上方） ──
+                      // 力量训练开关
                       if (p.goal == FitnessGoal.fatLoss)
                         SwitchListTile(
                           title: const Text('不做力量训练（纯饮食控制）',
@@ -594,27 +312,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           contentPadding: EdgeInsets.zero,
                           dense: true,
                         ),
-                      // ── 训练时间（仅力量训练时显示） ──
+                      // 训练时间（仅力量训练时显示）
                       if (!p.noStrengthTraining) ...[
                         const SizedBox(height: 8),
-                        Text('训练时间',
-                            style: TextStyle(
-                                color: Colors.grey[400], fontSize: 13)),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: TrainingTime.values
-                              .map((t) => ChoiceChip(
-                                    label: Text('${t.icon} ${t.label}',
-                                        style: const TextStyle(fontSize: 13)),
-                                    selected: p.trainingTime == t,
-                                    onSelected: (_) {
-                                      setState(() => p.trainingTime = t);
-                                      _save();
-                                    },
-                                  ))
-                              .toList(),
+                        InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: '训练时间',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.schedule),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<TrainingTime>(
+                              value: p.trainingTime,
+                              isDense: true,
+                              isExpanded: true,
+                              items: TrainingTime.values
+                                  .map((t) => DropdownMenuItem(
+                                        value: t,
+                                        child: Text('${t.icon} ${t.label}',
+                                            style: const TextStyle(fontSize: 14)),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() => p.trainingTime = v);
+                                _save();
+                              },
+                            ),
+                          ),
                         ),
                       ],
                     ]))),
@@ -674,7 +401,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              setState(() {});
+                              _save();
                             },
                           )),
                           const SizedBox(width: 8),
@@ -696,7 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              setState(() {});
+                              _save();
                             },
                           )),
                           const SizedBox(width: 8),
@@ -718,7 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              setState(() {});
+                              _save();
                             },
                           )),
                         ]),
@@ -743,7 +470,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              setState(() {});
+                              _save();
                             },
                           )),
                           const SizedBox(width: 12),
@@ -765,7 +492,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              setState(() {});
+                              _save();
                             },
                           )),
                         ]),
@@ -921,77 +648,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                     ]),
                 ]))),
-        const SizedBox(height: 12),
-
-        // ---- 推荐说明 ----
-        Card(
-            child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('推荐说明',
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Text(
-                        p.goal == FitnessGoal.fatLoss
-                            ? _hasAppliedRecommendation
-                                ? '减脂期（纯饮食控制），基于身高${p.height.toStringAsFixed(0)}cm / 体重${p.weight.toStringAsFixed(0)}kg / ${p.gender == Gender.male ? "男" : "女"} 的参考表推荐：蛋白质 ${p.proteinPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyProtein().toStringAsFixed(0)} g），训练日碳水 ${p.carbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyCarbs().toStringAsFixed(0)} g），休息日碳水 ${p.restCarbsPerKg.toStringAsFixed(1)} g/kg（每日 ${_calcDailyRestCarbs().toStringAsFixed(0)} g）。'
-                                : '减脂期高蛋白摄入（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）有助于保留肌肉，适量碳水维持训练表现。'
-                            : '增肌期适量蛋白（${p.weight.toStringAsFixed(0)}kg × ${p.proteinPerKg.toStringAsFixed(1)}g/kg）配合充足碳水为训练供能，促进肌肉合成。',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                      ),
-                    ]))),
         const SizedBox(height: 16),
-
-        // ---- 配餐模板 ----
-        Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TemplateListScreen(
-                    foods: widget.foods,
-                    templates: widget.templates,
-                  ),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                Icon(Icons.restaurant_menu, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('配餐模板',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 15)),
-                        Text('共 ${widget.templates.length} 个已保存的模板',
-                            style: TextStyle(
-                                color: Colors.grey[400], fontSize: 13)),
-                      ]),
-                ),
-                Icon(Icons.chevron_right, color: Colors.grey),
-              ]),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // ---- 保存按钮 ----
-        FilledButton.icon(
-          onPressed: _save,
-          icon: const Icon(Icons.save),
-          label: const Text('保存个人资料'),
-          style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14)),
-        ),
       ],
     );
   }
@@ -1016,4 +673,3 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return w * rck;
   }
 }
-

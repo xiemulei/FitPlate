@@ -29,10 +29,10 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.food?.name ?? '');
     _proteinCtrl = TextEditingController(
-      text: widget.food?.proteinPer100G.toStringAsFixed(4) ?? '0.00',
+      text: widget.food?.proteinPer100G.toStringAsFixed(1) ?? '0.0',
     );
     _carbsCtrl = TextEditingController(
-      text: widget.food?.carbsPer100G.toStringAsFixed(4) ?? '0.00',
+      text: widget.food?.carbsPer100G.toStringAsFixed(1) ?? '0.0',
     );
     _unit = widget.food?.unit ?? FoodUnit.grams100g;
     _category = widget.food?.category ?? FoodCategory.uncategorized;
@@ -132,7 +132,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
         children: [
           // 食物图标
           Center(

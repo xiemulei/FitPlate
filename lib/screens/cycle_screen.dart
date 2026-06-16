@@ -3,7 +3,6 @@ import '../models/food.dart';
 import '../models/user_profile.dart';
 import '../models/cycle.dart';
 import 'cycle_editor_screen.dart';
-import 'training_time_picker_screen.dart';
 
 class CycleScreen extends StatefulWidget {
   final List<TrainingCycle> cycles;
@@ -37,104 +36,62 @@ class _CycleScreenState extends State<CycleScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: const Text('创建新循环'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '循环名称',
-                  hintText: '如：三分化训练',
-                  border: OutlineInputBorder(),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '循环名称',
+                    hintText: '如：三分化训练',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              Text('快速预设',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text('🏋️ 三分化（练三休一）'),
-                    onPressed: () {
-                      nameCtrl.text = '三分化训练';
-                      lengthCtrl.text = '4';
-                      setDialogState(() => selectedPreset = '三分化');
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text('🏋️ 四分化（练二休一循环）'),
-                    onPressed: () {
-                      nameCtrl.text = '四分化训练';
-                      lengthCtrl.text = '3';
-                      setDialogState(() => selectedPreset = '四分化');
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text('自定义'),
-                    onPressed: () {
-                      setDialogState(() => selectedPreset = null);
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: lengthCtrl,
-                decoration: const InputDecoration(
-                  labelText: '循环天数',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_view_day),
+                const SizedBox(height: 16),
+                Text('快速预设',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ActionChip(
+                      label: const Text('🏋️ 三分化（练三休一）'),
+                      onPressed: () {
+                        nameCtrl.text = '三分化训练';
+                        lengthCtrl.text = '4';
+                        setDialogState(() => selectedPreset = '三分化');
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text('🏋️ 四分化（练二休一循环）'),
+                      onPressed: () {
+                        nameCtrl.text = '四分化训练';
+                        lengthCtrl.text = '3';
+                        setDialogState(() => selectedPreset = '四分化');
+                      },
+                    ),
+                    ActionChip(
+                      label: const Text('自定义'),
+                      onPressed: () {
+                        setDialogState(() => selectedPreset = null);
+                      },
+                    ),
+                  ],
                 ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [3, 4, 5, 6, 7]
-                    .map((n) => ActionChip(
-                          label: Text('$n天'),
-                          onPressed: () {
-                            lengthCtrl.text = n.toString();
-                            setDialogState(() {});
-                          },
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text('配餐方案',
-                      style:
-                          TextStyle(fontSize: 13, color: Colors.grey[600])),
-                  const Spacer(),
-                  ActionChip(
-                    label: Text(selectedTime.label,
-                        style: const TextStyle(fontSize: 12)),
-                    avatar: Text(selectedTime.icon,
-                        style: const TextStyle(fontSize: 14)),
-                    onPressed: () async {
-                      final result = await Navigator.push<TrainingTime>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => TrainingTimePickerScreen(
-                            profile: widget.profile,
-                            current: selectedTime,
-                          ),
-                        ),
-                      );
-                      if (result != null) {
-                        setDialogState(() => selectedTime = result);
-                      }
-                    },
+                const SizedBox(height: 12),
+                TextField(
+                  controller: lengthCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '循环天数',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.calendar_view_day),
                   ),
-                ],
-              ),
-            ],
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(

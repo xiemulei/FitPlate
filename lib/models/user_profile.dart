@@ -134,7 +134,6 @@ class UserProfile {
   double get dailyProtein => weight * proteinPerKg;
   double get dailyCarbs => weight * carbsPerKg;
   double get dailyRestCarbs => weight * restCarbsPerKg;
-  double get dailyCalories => dailyProtein * 4 + dailyCarbs * 4;
 
   bool get showNoStrengthOption => goal == FitnessGoal.fatLoss;
 

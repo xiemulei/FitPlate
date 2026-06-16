@@ -60,11 +60,11 @@ class MealPlanService {
     }
 
     // ── 休息日 / 无力训 ──
-    final meals = isStrengthTraining
-        ? MealDistributions.forTrainingTime(trainingTime)!.restDayMeals
+    final allMeals = isStrengthTraining
+        ? MealDistributions.forTrainingTime(trainingTime)?.restDayMeals
         : MealDistributions.noStrengthMeals;
 
-    for (final portion in meals) {
+    for (final portion in allMeals ?? MealDistributions.noStrengthMeals) {
       entries.add(_toEntry(portion, profile, isRestDay: isRestDay));
     }
     return entries;

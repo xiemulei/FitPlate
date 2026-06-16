@@ -23,8 +23,11 @@ class MealPlanEditorScreen extends StatefulWidget {
 
 class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
   late TextEditingController _nameCtrl;
+  final Map<String, TextEditingController> _mealNameCtrls = {};
   late MealPlanTemplate _t;
   bool _isTraining = true; // 当前显示训练日还是休息日
+
+  String _mealCtrlKey(int idx) => '${_isTraining}_$idx';
 
   @override
   void initState() {
@@ -58,7 +61,19 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    for (final c in _mealNameCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _setTraining(bool v) {
+    if (_isTraining == v) return;
+    for (final c in _mealNameCtrls.values) {
+      c.dispose();
+    }
+    _mealNameCtrls.clear();
+    setState(() => _isTraining = v);
   }
 
   List<MealSlotDef> get _meals => _isTraining ? _t.trainingMeals : _t.restMeals;
@@ -150,7 +165,8 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
   String _calcGrams(MealSlotDef m) {
     final p = widget.profile;
     if (p == null) return '';
-    final c = (p.dailyCarbs * m.carbRatio).round();
+    final carbs = _isTraining ? p.dailyCarbs : p.dailyRestCarbs;
+    final c = (carbs * m.carbRatio).round();
     final pr = (p.dailyProtein * m.proteinRatio).round();
     return '≈ ${c}g碳 / ${pr}g蛋';
   }
@@ -197,7 +213,7 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
                 Expanded(
                   child: Text(
                     '${profile.weight.toStringAsFixed(0)}kg · '
-                    '每日 ${profile.dailyProtein.toStringAsFixed(0)}g蛋白 / ${profile.dailyCarbs.toStringAsFixed(0)}g碳水',
+                    '每日 ${profile.dailyProtein.toStringAsFixed(0)}g蛋白 / 训${profile.dailyCarbs.toStringAsFixed(0)}g碳水 · 休${profile.dailyRestCarbs.toStringAsFixed(0)}g碳水',
                     style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
                   ),
                 ),
@@ -208,11 +224,11 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
           // ── Tab: 训练日/休息日 ──
           Row(children: [
             Expanded(
-              child: _tabBtn('🏋️ 训练日', _isTraining, () => setState(() => _isTraining = true)),
+              child: _tabBtn('🏋️ 训练日', _isTraining, () => _setTraining(true)),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _tabBtn('😴 休息日', !_isTraining, () => setState(() => _isTraining = false)),
+              child: _tabBtn('😴 休息日', !_isTraining, () => _setTraining(false)),
             ),
           ]),
           const SizedBox(height: 12),
@@ -292,7 +308,8 @@ class _MealPlanEditorScreenState extends State<MealPlanEditorScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
-                    controller: TextEditingController(text: m.name),
+                    controller: _mealNameCtrls.putIfAbsent(
+                        _mealCtrlKey(idx), () => TextEditingController(text: m.name)),
                     decoration: const InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
@@ -487,6 +504,7 @@ class _FoodPickerSheet extends StatefulWidget {
 
 class _FoodPickerSheetState extends State<_FoodPickerSheet> {
   late List<FoodAssignment> _selected;
+  final Map<String, TextEditingController> _gramCtrls = {};
   // 按分类分组
   late Map<String, List<Food>> _carbFoods;
   late Map<String, List<Food>> _proteinFoods;
@@ -510,10 +528,20 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
     }
   }
 
+  @override
+  void dispose() {
+    for (final c in _gramCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
   void _toggle(String foodId, double proteinPer100G, double carbsPer100G) {
     setState(() {
       final idx = _selected.indexWhere((s) => s.foodId == foodId);
       if (idx >= 0) {
+        _gramCtrls[foodId]?.dispose();
+        _gramCtrls.remove(foodId);
         _selected.removeAt(idx);
       } else {
         // 默认 100g
@@ -525,7 +553,10 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
   void _updateGrams(String foodId, double grams) {
     setState(() {
       final idx = _selected.indexWhere((s) => s.foodId == foodId);
-      if (idx >= 0) _selected[idx].grams = grams.roundToDouble();
+      if (idx >= 0) {
+        _selected[idx].grams = grams.roundToDouble();
+        _gramCtrls[foodId]?.text = _selected[idx].grams.round().toString();
+      }
     });
   }
 
@@ -646,8 +677,8 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
             SizedBox(
               width: 60,
               child: TextField(
-                controller: TextEditingController(
-                    text: '${sel.grams.round()}'),
+                controller: _gramCtrls.putIfAbsent(
+                    food.id, () => TextEditingController(text: '${sel.grams.round()}')),
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 decoration: const InputDecoration(

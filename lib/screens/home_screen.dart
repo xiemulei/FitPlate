@@ -29,17 +29,21 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _foods = List.from(PresetFoods.all);
   }
 
   Future<void> _loadData() async {
     final t = await StorageService.loadTemplates();
     final pr = await StorageService.loadProfile();
     final c = await StorageService.loadCycles();
+    final customFoods = await StorageService.loadFoods();
     setState(() {
       _templates = t;
       _cycles = c;
       _profile = pr;
+      _foods = [
+        ...PresetFoods.all,
+        ...customFoods.where((f) => !PresetFoods.all.any((p) => p.id == f.id)),
+      ];
     });
   }
 
@@ -51,6 +55,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _onCyclesChanged(List<TrainingCycle> cycles) async {
     setState(() => _cycles = cycles);
     await StorageService.saveCycles(cycles);
+  }
+
+  Future<void> _onFoodsChanged(List<Food> foods) async {
+    setState(() => _foods = foods);
+    await StorageService.saveFoods(
+        foods.where((f) => !PresetFoods.all.contains(f)).toList());
+  }
+
+  Future<void> _addFood() async {
+    final result = await Navigator.push<Food>(
+      context,
+      MaterialPageRoute(builder: (_) => const FoodDetailScreen()),
+    );
+    if (result != null) {
+      final foods = [..._foods, result];
+      setState(() => _foods = foods);
+      await StorageService.saveFoods(
+          foods.where((f) => !PresetFoods.all.contains(f)).toList());
+    }
   }
 
   @override
@@ -65,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       FoodLibraryScreen(
         foods: _foods,
-        onFoodsChanged: (f) => setState(() => _foods = f),
+        onFoodsChanged: _onFoodsChanged,
       ),
       MealPlannerScreen(
         foods: _foods,
@@ -90,20 +113,30 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('FitPlate',
             style: TextStyle(fontWeight: FontWeight.w700)),
         centerTitle: false,
+        actions: [
+          if (_currentIndex == 4)
+            IconButton(
+              icon: const Icon(Icons.save),
+              tooltip: '保存个人资料',
+              onPressed: () {
+                _onProfileChanged(_profile);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('个人资料已保存'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
-      body: pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
       floatingActionButton: _currentIndex == 1
           ? FloatingActionButton.extended(
-              onPressed: () async {
-                final result = await Navigator.push<Food>(
-                  context,
-                  MaterialPageRoute(builder: (_) => const FoodDetailScreen()),
-                );
-                if (result != null) {
-                  _foods.add(result);
-                  setState(() {});
-                }
-              },
+              onPressed: _addFood,
               icon: const Icon(Icons.add),
               label: const Text('添加食物'),
             )

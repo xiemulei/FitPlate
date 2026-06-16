@@ -278,8 +278,12 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
         ),
         title: Row(
           children: [
-            Text(food.name,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            Flexible(
+              child: Text(food.name,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(fontWeight: FontWeight.w600)),
+            ),
             if (isCustom) ...[
               const SizedBox(width: 6),
               Container(

@@ -31,13 +31,19 @@ class _TodayScreenState extends State<TodayScreen> {
   // 当前选中的循环日
   int _selectedDayIndex = 0;
 
-  // 每餐的食物选择
-  final Map<int, List<_FoodServing>> _selections = {};
+  // 每餐的食物选择 — keyed by "${dayIndex}_${mealIndex}"
+  final Map<String, List<_FoodServing>> _selections = {};
   int? _expandedMealIndex;
 
-  // 分类后的食物
-  late List<Food> _carbFoods;
-  late List<Food> _proteinFoods;
+  // 分类后的食物（getter 确保 widget.foods 异步更新后立即生效）
+  List<Food> get _carbFoods =>
+      widget.foods.where((f) => f.category == FoodCategory.staple).toList();
+  List<Food> get _proteinFoods =>
+      widget.foods
+          .where((f) =>
+              f.category == FoodCategory.leanProtein ||
+              f.category == FoodCategory.proteinPowder)
+          .toList();
 
   @override
   void initState() {
@@ -46,58 +52,117 @@ class _TodayScreenState extends State<TodayScreen> {
     if (active?.todayIndex != null) {
       _selectedDayIndex = active!.todayIndex!;
     }
-    _carbFoods = widget.foods
-        .where((f) => f.category == FoodCategory.staple)
-        .toList();
-    _proteinFoods = widget.foods
-        .where((f) =>
-            f.category == FoodCategory.leanProtein ||
-            f.category == FoodCategory.proteinPowder)
-        .toList();
   }
 
+  String _selKey(int mealIdx) => '${_selectedDayIndex}_$mealIdx';
   List<_FoodServing> _servings(int i) =>
-      _selections.putIfAbsent(i, () => []);
+      _selections.putIfAbsent(_selKey(i), () => []);
 
-  void _addCarb(int i) {
+  double _remainingCarbs(int mealIdx) {
+    final meal = _mealsForDay()?[mealIdx];
+    if (meal == null) return 0;
+    final selected = _servings(mealIdx)
+        .where((s) => _isCarbFood(s.food))
+        .fold(0.0, (sum, s) => sum + s.food.carbsPer100G / 100 * s.grams);
+    return (meal.carbsG - selected).clamp(0.0, meal.carbsG.toDouble());
+  }
+
+  double _remainingProtein(int mealIdx) {
+    final meal = _mealsForDay()?[mealIdx];
+    if (meal == null) return 0;
+    final selected = _servings(mealIdx)
+        .where((s) => !_isCarbFood(s.food))
+        .fold(0.0, (sum, s) => sum + s.food.proteinPer100G / 100 * s.grams);
+    return (meal.proteinG - selected).clamp(0.0, meal.proteinG.toDouble());
+  }
+
+  void _pickCarb(int mealIdx) async {
     if (_carbFoods.isEmpty) return;
-    final meal = _mealsForDay()?[i];
+    final meal = _mealsForDay()?[mealIdx];
     if (meal == null) return;
-    final food = _carbFoods.first;
+
+    final food = await showModalBottomSheet<Food>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _SimpleFoodPicker(
+        foods: _carbFoods,
+        title: '选碳水主食',
+        color: Colors.orange,
+      ),
+    );
+    if (food == null) return;
+
+    final remaining = _remainingCarbs(mealIdx);
+    final target = remaining > 5 ? remaining : meal.carbsG.toDouble();
     final grams = food.carbsPer100G > 0
-        ? (meal.carbsG / food.carbsPer100G * 100).clamp(10, 500).roundToDouble()
+        ? (target / food.carbsPer100G * 100).clamp(10, 500).roundToDouble()
         : 100.0;
-    setState(() => _servings(i).add(_FoodServing(food, grams)));
+    setState(() => _servings(mealIdx).add(_FoodServing(food, grams)));
   }
 
-  void _addProtein(int i) {
+  void _pickProtein(int mealIdx) async {
     if (_proteinFoods.isEmpty) return;
-    final meal = _mealsForDay()?[i];
+    final meal = _mealsForDay()?[mealIdx];
     if (meal == null) return;
-    final food = _proteinFoods.first;
+
+    final food = await showModalBottomSheet<Food>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _SimpleFoodPicker(
+        foods: _proteinFoods,
+        title: '选蛋白质',
+        color: Colors.green,
+      ),
+    );
+    if (food == null) return;
+
+    final remaining = _remainingProtein(mealIdx);
+    final target = remaining > 5 ? remaining : meal.proteinG.toDouble();
     final grams = food.proteinPer100G > 0
-        ? (meal.proteinG / food.proteinPer100G * 100).clamp(10, 500).roundToDouble()
+        ? (target / food.proteinPer100G * 100).clamp(10, 500).roundToDouble()
         : 100.0;
-    setState(() => _servings(i).add(_FoodServing(food, grams)));
+    setState(() => _servings(mealIdx).add(_FoodServing(food, grams)));
   }
 
-  void _removeServing(int i, int idx) =>
-      setState(() => _servings(i).removeAt(idx));
+  void _removeServing(int i, int idx) {
+    _servings(i)[idx].dispose();
+    setState(() => _servings(i).removeAt(idx));
+  }
 
   void _updateGrams(int i, int idx, double grams) =>
-      setState(() => _servings(i)[idx].grams = grams.roundToDouble());
+      setState(() => _servings(i)[idx].updateGrams(grams));
 
   void _changeFood(int i, int idx, String foodId, bool isCarb) {
     final foods = isCarb ? _carbFoods : _proteinFoods;
     final food = foods.firstWhere((f) => f.id == foodId);
     final meal = _mealsForDay()![i];
+
+    // 计算其他同类别食物贡献后剩下的目标
+    double otherContrib = 0;
+    for (int j = 0; j < _servings(i).length; j++) {
+      if (j == idx) continue;
+      final s = _servings(i)[j];
+      if (isCarb && _isCarbFood(s.food)) {
+        otherContrib += s.food.carbsPer100G / 100 * s.grams;
+      } else if (!isCarb && !_isCarbFood(s.food)) {
+        otherContrib += s.food.proteinPer100G / 100 * s.grams;
+      }
+    }
+    final target = isCarb ? meal.carbsG.toDouble() : meal.proteinG.toDouble();
+    final remaining = (target - otherContrib).clamp(5.0, target);
+
     final newGrams = isCarb
         ? (food.carbsPer100G > 0
-            ? (meal.carbsG / food.carbsPer100G * 100).clamp(10, 500).roundToDouble()
+            ? (remaining / food.carbsPer100G * 100).clamp(10, 500).roundToDouble()
             : 100.0)
         : (food.proteinPer100G > 0
-            ? (meal.proteinG / food.proteinPer100G * 100).clamp(10, 500).roundToDouble()
+            ? (remaining / food.proteinPer100G * 100).clamp(10, 500).roundToDouble()
             : 100.0);
+    _servings(i)[idx].dispose();
     setState(() => _servings(i)[idx] = _FoodServing(food, newGrams));
   }
 
@@ -434,17 +499,19 @@ class _TodayScreenState extends State<TodayScreen> {
             ),
           ),
 
-          // ── 进度条 ──
+          // ── 已选食物总重 ──
           if (servings.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(children: [
-                _progressBar(
-                    '碳水', totals.carbs, meal.carbsG.toDouble(), Colors.orange),
-                const SizedBox(height: 2),
-                _progressBar('蛋白质', totals.protein,
-                    meal.proteinG.toDouble(), Colors.green),
-              ]),
+              child: Row(
+                children: [
+                  Icon(Icons.restaurant, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text('已选食物共 ${totals.grams.round()}g',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey[700])),
+                ],
+              ),
             ),
 
           // ── 展开：选食物 ──
@@ -452,97 +519,95 @@ class _TodayScreenState extends State<TodayScreen> {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🌾 碳水主食
-                  Row(children: [
-                    Icon(Icons.grain, size: 14, color: Colors.orange[600]),
-                    const SizedBox(width: 4),
-                    Text('碳水主食',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.orange[700])),
-                  ]),
-                  if (carbSvs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text('还没选碳水',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500])),
+                  // 左侧：碳水
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(Icons.grain, size: 14, color: Colors.orange[600]),
+                          const SizedBox(width: 4),
+                          Text('碳水',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange[700])),
+                        ]),
+                        if (carbSvs.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text('还没选碳水',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[500])),
+                          ),
+                        ...carbSvs.asMap().entries.map(
+                            (e) => _foodRow(i, e.key, e.value, true, Colors.orange)),
+                        const SizedBox(height: 4),
+                        TextButton.icon(
+                          onPressed:
+                              _carbFoods.isEmpty ? null : () => _pickCarb(i),
+                          icon: const Icon(Icons.add_circle_outline, size: 14),
+                          label: const Text('选碳水',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.orange[700],
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        ),
+                      ],
                     ),
-                  ...carbSvs.asMap().entries.map(
-                      (e) => _foodRow(i, e.key, e.value, true, Colors.orange)),
-                  TextButton.icon(
-                    onPressed:
-                        _carbFoods.isEmpty ? null : () => _addCarb(i),
-                    icon: const Icon(Icons.add_circle_outline, size: 14),
-                    label: const Text('选碳水主食',
-                        style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(
-                        foregroundColor: Colors.orange[700],
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   ),
-
-                  // 💪 蛋白质
-                  Row(children: [
-                    Icon(Icons.fitness_center,
-                        size: 14, color: Colors.green[600]),
-                    const SizedBox(width: 4),
-                    Text('蛋白质',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green[700])),
-                  ]),
-                  if (proteinSvs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text('还没选蛋白质',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500])),
+                  const SizedBox(width: 12),
+                  // 右侧：蛋白质
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(Icons.fitness_center,
+                              size: 14, color: Colors.green[600]),
+                          const SizedBox(width: 4),
+                          Text('蛋白质',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green[700])),
+                        ]),
+                        if (proteinSvs.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text('还没选蛋白质',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[500])),
+                          ),
+                        ...proteinSvs.asMap().entries.map((e) =>
+                            _foodRow(i, e.key, e.value, false, Colors.green)),
+                        const SizedBox(height: 4),
+                        TextButton.icon(
+                          onPressed: _proteinFoods.isEmpty
+                              ? null
+                              : () => _pickProtein(i),
+                          icon: const Icon(Icons.add_circle_outline, size: 14),
+                          label: const Text('选蛋白质',
+                              style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(
+                              foregroundColor: Colors.green[700],
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        ),
+                      ],
                     ),
-                  ...proteinSvs.asMap().entries.map((e) =>
-                      _foodRow(i, e.key, e.value, false, Colors.green)),
-                  TextButton.icon(
-                    onPressed:
-                        _proteinFoods.isEmpty ? null : () => _addProtein(i),
-                    icon: const Icon(Icons.add_circle_outline, size: 14),
-                    label: const Text('选蛋白质',
-                        style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(
-                        foregroundColor: Colors.green[700],
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                   ),
                 ],
               ),
             ),
           ],
 
-          // ── 已选合计（底部） ──
-          if (servings.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.04),
-                borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(8),
-                    bottomRight: Radius.circular(8)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _cmp('碳水', totals.carbs, meal.carbsG.toDouble(), Colors.orange),
-                  _cmp('蛋白质', totals.protein, meal.proteinG.toDouble(), Colors.green),
-                  _cmp('食物量', totals.grams, 0, Colors.grey, hideTarget: true),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -557,83 +622,99 @@ class _TodayScreenState extends State<TodayScreen> {
     final calcProtein = sv.food.proteinPer100G / 100 * sv.grams;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 下拉选食物
-          Expanded(
-            flex: 3,
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isDense: true,
-                value: sv.food.id,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: color),
-                items: foods.map((f) => DropdownMenuItem(
-                      value: f.id,
-                      child: Text(f.name, style: const TextStyle(fontSize: 12)),
-                    )).toList(),
-                onChanged: (fid) {
-                  if (fid != null) {
-                    _changeFood(mealIdx, idx, fid, isCarb);
-                  }
-                },
+          // 第一行：食物名称（占满宽度）
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isDense: true,
+                    isExpanded: true,
+                    value: sv.food.id,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: color),
+                    items: foods.map((f) => DropdownMenuItem(
+                          value: f.id,
+                          child: Text(f.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13)),
+                        )).toList(),
+                    onChanged: (fid) {
+                      if (fid != null) {
+                        _changeFood(mealIdx, idx, fid, isCarb);
+                      }
+                    },
+                  ),
+                ),
               ),
-            ),
-          ),
-          // 克数输入框
-          SizedBox(
-            width: 56,
-            child: TextField(
-              controller:
-                  TextEditingController(text: '${sv.grams.round()}'),
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                isDense: true,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                border: OutlineInputBorder(),
+              // 删除
+              GestureDetector(
+                onTap: () => _removeServing(mealIdx, idx),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(Icons.close,
+                      size: 16, color: Colors.grey[500]),
+                ),
               ),
-              style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w700),
-              onChanged: (v) {
-                final g = double.tryParse(v);
-                if (g != null && g > 0) {
-                  _updateGrams(mealIdx, idx, g);
-                }
-              },
-            ),
+            ],
           ),
-          const SizedBox(width: 2),
-          Text('g',
-              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-          const SizedBox(width: 4),
-          // 营养贡献
-          Text(isCarb ? '碳${calcCarbs.round()}g' : '蛋${calcProtein.round()}g',
-              style: TextStyle(
-                  fontSize: 10,
-                  color: color,
-                  fontWeight: FontWeight.w500)),
-          const Spacer(),
-          // 删除
-          GestureDetector(
-            onTap: () => _removeServing(mealIdx, idx),
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              child:
-                  Icon(Icons.close, size: 14, color: Colors.grey[500]),
-            ),
+          // 第二行：克数 + 营养贡献
+          Row(
+            children: [
+              SizedBox(
+                width: 56,
+                child: TextField(
+                  controller: sv.gramCtrl,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 2, vertical: 4),
+                    border: OutlineInputBorder(),
+                  ),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: color,
+                      fontWeight: FontWeight.w700),
+                  onChanged: (v) {
+                    final g = double.tryParse(v);
+                    if (g != null && g > 0) {
+                      _updateGrams(mealIdx, idx, g);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 2),
+              Text('g',
+                  style:
+                      TextStyle(fontSize: 11, color: Colors.grey[500])),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  isCarb
+                      ? '碳水 ${calcCarbs.round()}g'
+                      : '蛋白质 ${calcProtein.round()}g',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: color,
+                      fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -641,50 +722,6 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   // ─── 工具组件 ──────────────────────────────────────
-
-  Widget _progressBar(
-      String label, double current, double target, Color c) {
-    final ratio = target > 0 ? (current / target).clamp(0.0, 1.5) : 0.0;
-    return Row(
-      children: [
-        SizedBox(
-            width: 28,
-            child: Text(label,
-                style: TextStyle(fontSize: 10, color: Colors.grey[500]))),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: ratio > 1.0 ? 1.0 : ratio,
-              minHeight: 5,
-              backgroundColor: Colors.grey.withValues(alpha: 0.1),
-              valueColor:
-                  AlwaysStoppedAnimation(ratio >= 1.0 ? Colors.green : c),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text('${current.toStringAsFixed(0)}/${target.toStringAsFixed(0)}g',
-            style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-      ],
-    );
-  }
-
-  Widget _cmp(String label, double current, double target, Color c,
-      {bool hideTarget = false}) {
-    return Column(children: [
-      Text('${current.toStringAsFixed(0)}${hideTarget ? "g" : ""}',
-          style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: current >= target && !hideTarget ? Colors.green : c)),
-      if (!hideTarget)
-        Text('/ ${target.toStringAsFixed(0)}g',
-            style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-      Text(label,
-          style: TextStyle(fontSize: 10, color: Colors.grey[400])),
-    ]);
-  }
 
   IconData _mealIcon(MealType? type) {
     switch (type) {
@@ -713,5 +750,86 @@ class _TodayScreenState extends State<TodayScreen> {
 class _FoodServing {
   Food food;
   double grams;
-  _FoodServing(this.food, this.grams);
+  late final TextEditingController gramCtrl;
+
+  _FoodServing(this.food, this.grams) {
+    gramCtrl = TextEditingController(text: grams.round().toString());
+  }
+
+  void updateGrams(double v) {
+    grams = v.roundToDouble();
+    gramCtrl.text = grams.round().toString();
+  }
+
+  void dispose() => gramCtrl.dispose();
+}
+
+/// 食物选择底部弹窗（单选 — 点击即选）
+class _SimpleFoodPicker extends StatelessWidget {
+  final List<Food> foods;
+  final String title;
+  final Color color;
+
+  const _SimpleFoodPicker({
+    required this.foods,
+    required this.title,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.5,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: foods.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 56),
+              itemBuilder: (ctx, i) {
+                final f = foods[i];
+                return ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    child: Text(f.name.isNotEmpty ? f.name[0] : '?',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: color)),
+                  ),
+                  title: Text(f.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: 14)),
+                  subtitle: Text(
+                    '每100g: 碳水${f.carbsPer100G.toStringAsFixed(1)}g · 蛋白${f.proteinPer100G.toStringAsFixed(1)}g',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                  trailing: Icon(Icons.add_circle_outline,
+                      size: 22, color: color),
+                  onTap: () => Navigator.pop(context, f),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

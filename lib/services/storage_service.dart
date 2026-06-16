@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../models/food.dart';
@@ -28,7 +29,8 @@ class StorageService {
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => MealTemplate.fromJson(j)).toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('StorageService.loadTemplates: $e');
       return [];
     }
   }
@@ -47,7 +49,8 @@ class StorageService {
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => WeeklyPlan.fromJson(j)).toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('StorageService.loadPlans: $e');
       return [];
     }
   }
@@ -65,7 +68,8 @@ class StorageService {
       if (!await File(f).exists()) return UserProfile();
       final s = await File(f).readAsString();
       return UserProfile.fromJson(jsonDecode(s));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('StorageService.loadProfile: $e');
       return UserProfile();
     }
   }
@@ -82,8 +86,21 @@ class StorageService {
       if (!await File(f).exists()) return [];
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
-      return list.map((j) => TrainingCycle.fromJson(j)).toList();
-    } catch (_) {
+      final cycles = list.map((j) => TrainingCycle.fromJson(j)).toList();
+      if (cycles.where((c) => c.isActive).length > 1) {
+        debugPrint('StorageService.loadCycles: 检测到多个活跃循环，仅保留第一个');
+        var seenFirst = false;
+        return cycles.map((c) {
+          if (c.isActive && !seenFirst) {
+            seenFirst = true;
+            return c;
+          }
+          return c.copyWith(isActive: false);
+        }).toList();
+      }
+      return cycles;
+    } catch (e) {
+      debugPrint('StorageService.loadCycles: $e');
       return [];
     }
   }
@@ -100,10 +117,12 @@ class StorageService {
   static Future<List<MealPlanTemplate>> loadMealPlanTemplates() async {
     try {
       final f = await _path('meal_plans.json');
+      if (!await File(f).exists()) return [];
       final s = await File(f).readAsString();
       final list = jsonDecode(s) as List;
       return list.map((j) => MealPlanTemplate.fromJson(j)).toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('StorageService.loadMealPlanTemplates: $e');
       return [];
     }
   }
@@ -113,5 +132,24 @@ class StorageService {
     final f = await _path('meal_plans.json');
     await File(f).writeAsString(
         jsonEncode(templates.where((t) => !t.isBuiltIn).map((t) => t.toJson()).toList()));
+  }
+
+  // Save/Load custom foods
+  static Future<List<Food>> loadFoods() async {
+    try {
+      final f = await _path('foods.json');
+      if (!await File(f).exists()) return [];
+      final s = await File(f).readAsString();
+      final list = jsonDecode(s) as List;
+      return list.map((j) => Food.fromJson(j)).toList();
+    } catch (e) {
+      debugPrint('StorageService.loadFoods: $e');
+      return [];
+    }
+  }
+
+  static Future<void> saveFoods(List<Food> foods) async {
+    final f = await _path('foods.json');
+    await File(f).writeAsString(jsonEncode(foods.map((f) => f.toJson()).toList()));
   }
 }
