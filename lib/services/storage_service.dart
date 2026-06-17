@@ -7,6 +7,7 @@ import '../models/food.dart';
 import '../models/user_profile.dart';
 import '../models/cycle.dart';
 import '../models/meal_plan_template.dart';
+import '../models/daily_log.dart';
 
 class StorageService {
   static Future<Directory> get _dir async {
@@ -151,5 +152,41 @@ class StorageService {
   static Future<void> saveFoods(List<Food> foods) async {
     final f = await _path('foods.json');
     await File(f).writeAsString(jsonEncode(foods.map((f) => f.toJson()).toList()));
+  }
+
+  // ═════════════════════════════════
+  //  每日饮食日志
+  // ═════════════════════════════════
+
+  static Future<List<DailyFoodLog>> loadDailyLogs() async {
+    try {
+      final f = await _path('daily_logs.json');
+      if (!await File(f).exists()) return [];
+      final s = await File(f).readAsString();
+      final list = jsonDecode(s) as List;
+      return list.map((j) => DailyFoodLog.fromJson(j)).toList();
+    } catch (e) {
+      debugPrint('StorageService.loadDailyLogs: $e');
+      return [];
+    }
+  }
+
+  static Future<void> saveDailyLogs(List<DailyFoodLog> logs) async {
+    final f = await _path('daily_logs.json');
+    await File(f).writeAsString(jsonEncode(logs.map((l) => l.toJson()).toList()));
+  }
+
+  /// 获取某天的日志（如果不存在返回 null）
+  static Future<DailyFoodLog?> loadDailyLog(String date) async {
+    final logs = await loadDailyLogs();
+    return logs.where((l) => l.date == date).firstOrNull;
+  }
+
+  /// 保存或更新某天的日志
+  static Future<void> saveDailyLog(DailyFoodLog log) async {
+    final logs = await loadDailyLogs();
+    logs.removeWhere((l) => l.date == log.date);
+    logs.add(log);
+    await saveDailyLogs(logs);
   }
 }

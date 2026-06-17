@@ -6,10 +6,10 @@ import '../services/storage_service.dart';
 import '../data/food_data.dart';
 import 'food_library_screen.dart';
 import 'food_detail_screen.dart';
-import 'meal_planner_screen.dart';
 import 'profile_screen.dart';
 import 'today_screen.dart';
 import 'cycle_screen.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -79,27 +79,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final pages = [
+      // 标签0：今天
       TodayScreen(
         cycles: _cycles,
         templates: _templates,
         foods: _foods,
         onGoToCycle: () => setState(() => _currentIndex = 3),
+        onGoToHistory: () => setState(() => _currentIndex = 1),
         profile: _profile,
       ),
+      // 标签1：历史
+      HistoryScreen(foods: _foods),
+      // 标签2：食物库
       FoodLibraryScreen(
         foods: _foods,
         onFoodsChanged: _onFoodsChanged,
       ),
-      MealPlannerScreen(
-        foods: _foods,
-        profile: _profile,
-      ),
+      // 标签3：循环
       CycleScreen(
         cycles: _cycles,
         templates: _templates,
         profile: _profile,
         onCyclesChanged: _onCyclesChanged,
       ),
+      // 标签4：个人
       ProfileScreen(
         profile: _profile,
         onProfileChanged: _onProfileChanged,
@@ -134,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: pages,
       ),
-      floatingActionButton: _currentIndex == 1
+      floatingActionButton: _currentIndex == 2
           ? FloatingActionButton.extended(
               onPressed: _addFood,
               icon: const Icon(Icons.add),
@@ -145,12 +148,16 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.today_outlined), label: '今天'),
+          NavigationDestination(
+              icon: Icon(Icons.today_outlined), label: '今天'),
+          NavigationDestination(
+              icon: Icon(Icons.history_outlined), label: '历史'),
           NavigationDestination(
               icon: Icon(Icons.kitchen_outlined), label: '食物库'),
-          NavigationDestination(icon: Icon(Icons.scale_outlined), label: '配餐'),
-          NavigationDestination(icon: Icon(Icons.loop_outlined), label: '循环'),
-          NavigationDestination(icon: Icon(Icons.person_outlined), label: '个人'),
+          NavigationDestination(
+              icon: Icon(Icons.loop_outlined), label: '循环'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outlined), label: '个人'),
         ],
       ),
     );
