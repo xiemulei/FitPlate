@@ -77,12 +77,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 从 Today 页跳转到历史记录（全屏 push，不是 tab）
+  /// 从 Today 页跳转到历史记录（全屏 push）
   void _openHistory() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => HistoryScreen(foods: _foods),
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: const Text('饮食历史记录'),
+            leading: const BackButton(),
+          ),
+          body: HistoryScreen(foods: _foods),
+        ),
       ),
     );
   }
