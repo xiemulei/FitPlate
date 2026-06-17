@@ -6,6 +6,7 @@ import '../services/storage_service.dart';
 import '../data/food_data.dart';
 import 'food_library_screen.dart';
 import 'food_detail_screen.dart';
+import 'meal_planner_screen.dart';
 import 'profile_screen.dart';
 import 'today_screen.dart';
 import 'cycle_screen.dart';
@@ -76,6 +77,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// 从 Today 页跳转到历史记录（全屏 push，不是 tab）
+  void _openHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HistoryScreen(foods: _foods),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -85,15 +96,18 @@ class _HomeScreenState extends State<HomeScreen> {
         templates: _templates,
         foods: _foods,
         onGoToCycle: () => setState(() => _currentIndex = 3),
-        onGoToHistory: () => setState(() => _currentIndex = 1),
+        onGoToHistory: _openHistory,
         profile: _profile,
       ),
-      // 标签1：历史
-      HistoryScreen(foods: _foods),
-      // 标签2：食物库
+      // 标签1：食物库
       FoodLibraryScreen(
         foods: _foods,
         onFoodsChanged: _onFoodsChanged,
+      ),
+      // 标签2：配餐
+      MealPlannerScreen(
+        foods: _foods,
+        profile: _profile,
       ),
       // 标签3：循环
       CycleScreen(
@@ -137,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _currentIndex,
         children: pages,
       ),
-      floatingActionButton: _currentIndex == 2
+      floatingActionButton: _currentIndex == 1
           ? FloatingActionButton.extended(
               onPressed: _addFood,
               icon: const Icon(Icons.add),
@@ -151,9 +165,9 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
               icon: Icon(Icons.today_outlined), label: '今天'),
           NavigationDestination(
-              icon: Icon(Icons.history_outlined), label: '历史'),
-          NavigationDestination(
               icon: Icon(Icons.kitchen_outlined), label: '食物库'),
+          NavigationDestination(
+              icon: Icon(Icons.scale_outlined), label: '配餐'),
           NavigationDestination(
               icon: Icon(Icons.loop_outlined), label: '循环'),
           NavigationDestination(
