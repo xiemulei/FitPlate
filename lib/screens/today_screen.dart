@@ -829,50 +829,72 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
             ],
           ),
-          // 第二行：克数输入 + 单位转换 + 营养贡献
+          // 第二行：数量输入 + 营养贡献
           Row(
             children: [
-              SizedBox(
-                width: 64,
-                child: TextField(
-                  controller: sv.gramCtrl,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    border: OutlineInputBorder(),
+              // 按食物单位显示输入
+              if (_isUnitBased(sv.food)) ...[
+                // 按个/份/杯显示
+                SizedBox(
+                  width: 48,
+                  child: TextField(
+                    controller: sv.unitCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      border: OutlineInputBorder(),
+                    ),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: color,
+                        fontWeight: FontWeight.w700),
+                    onChanged: (v) {
+                      final n = double.tryParse(v);
+                      if (n != null && n > 0) {
+                        final g = n * sv.food.gramsPerUnit!;
+                        _updateGrams(mealIdx, idx, g);
+                      }
+                    },
                   ),
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: color,
-                      fontWeight: FontWeight.w700),
-                  onChanged: (v) {
-                    final g = double.tryParse(v);
-                    if (g != null && g > 0) {
-                      _updateGrams(mealIdx, idx, g);
-                    }
-                  },
                 ),
-              ),
-              const SizedBox(width: 4),
-              Text('g',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-              // 按食物单位换算显示
-              if (sv.food.unit != FoodUnit.grams100g &&
-                  sv.food.unit != FoodUnit.grams100ml &&
-                  sv.food.gramsPerUnit != null &&
-                  sv.food.gramsPerUnit! > 0 &&
-                  sv.grams > 0)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    '(≈${(sv.grams / sv.food.gramsPerUnit!).round()}${sv.food.unit.label})',
+                const SizedBox(width: 4),
+                Text(sv.food.unit.label,
                     style:
-                        TextStyle(fontSize: 11, color: Colors.grey[500]),
+                        TextStyle(fontSize: 12, color: Colors.grey[500])),
+              ] else ...[
+                // 按克显示
+                SizedBox(
+                  width: 64,
+                  child: TextField(
+                    controller: sv.gramCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      border: OutlineInputBorder(),
+                    ),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: color,
+                        fontWeight: FontWeight.w700),
+                    onChanged: (v) {
+                      final g = double.tryParse(v);
+                      if (g != null && g > 0) {
+                        _updateGrams(mealIdx, idx, g);
+                      }
+                    },
                   ),
                 ),
+                const SizedBox(width: 4),
+                Text('g',
+                    style:
+                        TextStyle(fontSize: 12, color: Colors.grey[500])),
+              ],
               const SizedBox(width: 12),
               Text(
                 '碳水 ${calcCarbs.toStringAsFixed(1)}g',
@@ -897,6 +919,13 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   // ─── 工具 ──────────────────────────────────────
+
+  /// 该食物是否按件计（个/份/杯）
+  bool _isUnitBased(Food f) =>
+      f.unit != FoodUnit.grams100g &&
+      f.unit != FoodUnit.grams100ml &&
+      f.gramsPerUnit != null &&
+      f.gramsPerUnit! > 0;
 
   IconData _mealIcon(MealType? type) {
     switch (type) {
@@ -982,9 +1011,16 @@ class _FoodServing {
   Food food;
   double grams;
   late final TextEditingController gramCtrl;
+  late final TextEditingController unitCtrl;
 
   _FoodServing(this.food, this.grams) {
+    final isUnit = food.unit != FoodUnit.grams100g &&
+        food.unit != FoodUnit.grams100ml &&
+        food.gramsPerUnit != null &&
+        food.gramsPerUnit! > 0;
     gramCtrl = TextEditingController(text: grams.round().toString());
+    unitCtrl = TextEditingController(
+        text: isUnit ? (grams / food.gramsPerUnit!).round().toString() : '');
   }
 
   static _FoodServing? fromRecord(FoodServingRecord rec, List<Food> allFoods) {
@@ -995,9 +1031,19 @@ class _FoodServing {
 
   void updateCtrl() {
     gramCtrl.text = grams.round().toString();
+    final isUnit = food.unit != FoodUnit.grams100g &&
+        food.unit != FoodUnit.grams100ml &&
+        food.gramsPerUnit != null &&
+        food.gramsPerUnit! > 0;
+    if (isUnit) {
+      unitCtrl.text = (grams / food.gramsPerUnit!).round().toString();
+    }
   }
 
-  void dispose() => gramCtrl.dispose();
+  void dispose() {
+    gramCtrl.dispose();
+    unitCtrl.dispose();
+  }
 }
 
 // ─── 全部食物选择弹窗 ────────────────────────────
