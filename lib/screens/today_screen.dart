@@ -920,10 +920,9 @@ class _TodayScreenState extends State<TodayScreen> {
 
   // ─── 工具 ──────────────────────────────────────
 
-  /// 该食物是否按件计（个/份/杯）
+  /// 该食物是否按个计（如鸡蛋、蛋白）
   bool _isUnitBased(Food f) =>
-      f.unit != FoodUnit.grams100g &&
-      f.unit != FoodUnit.grams100ml &&
+      f.unit == FoodUnit.piece &&
       f.gramsPerUnit != null &&
       f.gramsPerUnit! > 0;
 
@@ -1014,8 +1013,7 @@ class _FoodServing {
   late final TextEditingController unitCtrl;
 
   _FoodServing(this.food, this.grams) {
-    final isUnit = food.unit != FoodUnit.grams100g &&
-        food.unit != FoodUnit.grams100ml &&
+    final isUnit = food.unit == FoodUnit.piece &&
         food.gramsPerUnit != null &&
         food.gramsPerUnit! > 0;
     gramCtrl = TextEditingController(text: grams.round().toString());
@@ -1031,8 +1029,7 @@ class _FoodServing {
 
   void updateCtrl() {
     gramCtrl.text = grams.round().toString();
-    final isUnit = food.unit != FoodUnit.grams100g &&
-        food.unit != FoodUnit.grams100ml &&
+    final isUnit = food.unit == FoodUnit.piece &&
         food.gramsPerUnit != null &&
         food.gramsPerUnit! > 0;
     if (isUnit) {
