@@ -172,7 +172,7 @@ class _TodayScreenState extends State<TodayScreen> {
     _autoSave();
   }
 
-  /// 核心优化函数：在满足 >=0 的前提下，让碳水和蛋白都尽量接近目标
+  /// 核心优化函数：优先满足碳水目标，蛋白质尽力但不强求
   List<double> _optimizeGrams(
       List<Food> foods, double targetCarbs, double targetProtein) {
     if (foods.isEmpty) return [];
@@ -182,87 +182,59 @@ class _TodayScreenState extends State<TodayScreen> {
     final c = foods.map((f) => f.carbsPer100G / 100).toList();
     final p = foods.map((f) => f.proteinPer100G / 100).toList();
 
-    // ---- 情况1：1种食物 —— 用最紧的限制 ----
-    if (n == 1) {
-      double g = 0;
-      if (c[0] > 0 && p[0] > 0) {
-        // 取满足两个目标的最小值
-        g = (targetCarbs / c[0]) < (targetProtein / p[0])
-            ? (targetCarbs / c[0])
-            : (targetProtein / p[0]);
-      } else if (c[0] > 0) {
-        g = targetCarbs / c[0];
-      } else if (p[0] > 0) {
-        g = targetProtein / p[0];
-      }
-      return [g.clamp(0, 2000)];
-    }
+    // ── 策略：优先满足碳水，蛋白质随缘 ──
+    // 1) 先让含碳水的食物分摊碳水目标
+    // 2) 不含碳水的食物（如鸡蛋），按合理份量配
+    // 3) 最后算实际蛋白质到多少
 
-    // ---- 情况2：2种食物 —— 解线性方程组 ----
-    if (n == 2) {
-      final det = c[0] * p[1] - c[1] * p[0];
-      if (det.abs() > 1e-8) {
-        final g0 = (targetCarbs * p[1] - targetProtein * c[1]) / det;
-        final g1 = (c[0] * targetProtein - p[0] * targetCarbs) / det;
-        if (g0 >= -5 && g1 >= -5) {
-          return [g0.clamp(0, 2000), g1.clamp(0, 2000)];
-        }
-      }
-      // 行列式为0或解为负，退化：尝试单食物
-      final r0 = p[0] > 0 ? targetProtein / p[0] : 9999.0;
-      final r1 = p[1] > 0 ? targetProtein / p[1] : 9999.0;
-      if (r0 < r1) return [r0.clamp(0, 2000), 0];
-      return [0, r1.clamp(0, 2000)];
-    }
+    final result = List.filled(n, 0.0);
 
-    // ---- 情况3：3种及以上 —— 贪心+迭代优化 ----
-    // 思路：先尝试所有二元组合，选误差最小的；然后三元也按需迭代
-    return _multiFoodOptimize(foods, c, p, targetCarbs, targetProtein);
-  }
-
-  List<double> _multiFoodOptimize(List<Food> foods, List<double> c,
-      List<double> p, double targetCarbs, double targetProtein) {
-    final n = foods.length;
-
-    // 策略：用误差平方和作为目标函数，遍历二元组合选最优
-    double bestError = double.infinity;
-    List<double> best = List.filled(n, 0);
-
+    // 找出含碳水的食物索引
+    final carbIdx = <int>[];
+    final noCarbIdx = <int>[];
     for (int i = 0; i < n; i++) {
-      for (int j = i + 1; j < n; j++) {
-        final det = c[i] * p[j] - c[j] * p[i];
-        if (det.abs() < 1e-8) continue;
-        final gi = (targetCarbs * p[j] - targetProtein * c[j]) / det;
-        final gj = (c[i] * targetProtein - p[i] * targetCarbs) / det;
-        if (gi < 0 || gj < 0) continue;
-
-        final grams = List.filled(n, 0.0);
-        grams[i] = gi;
-        grams[j] = gj;
-
-        double actualCarbs = 0, actualProtein = 0;
-        for (int k = 0; k < n; k++) {
-          actualCarbs += c[k] * grams[k];
-          actualProtein += p[k] * grams[k];
-        }
-        final err = ((actualCarbs - targetCarbs) / targetCarbs).abs() +
-            ((actualProtein - targetProtein) / targetProtein).abs();
-        if (err < bestError) {
-          bestError = err;
-          best = grams;
-        }
+      if (c[i] > 0) {
+        carbIdx.add(i);
+      } else {
+        noCarbIdx.add(i);
       }
     }
 
-    // 如果二元组合都无解，按蛋白质比例分配（保守方案）
-    if (bestError == double.infinity) {
-      double totalP = p.fold(0.0, (s, v) => s + v);
+    // 分配碳水：按碳水贡献比例分摊
+    if (carbIdx.isNotEmpty) {
+      final totalC = carbIdx.fold(0.0, (s, i) => s + c[i]);
+      // 所有含碳水食物均分碳水目标（克数相同）
+      final grams = targetCarbs / totalC;
+      for (final i in carbIdx) {
+        result[i] = grams.clamp(0.0, 2000.0);
+      }
+    } else {
+      // 没有含碳水的食物，按蛋白质比例分
+      final totalP = p.fold(0.0, (s, v) => s + v);
       if (totalP > 0) {
-        best = p.map((v) => (v / totalP * targetProtein * 100).clamp(0.0, 2000.0)).toList();
+        for (int i = 0; i < n; i++) {
+          result[i] = (targetProtein / totalP).clamp(0.0, 2000.0);
+        }
       }
+      return result;
     }
 
-    return best.map((g) => g.clamp(0.0, 2000.0)).toList();
+    // 不含碳水的食物（如鸡蛋）：按合理份量配
+    // 每个配 1-2 份（鸡蛋2个，牛奶1杯等）
+    for (final i in noCarbIdx) {
+      final food = foods[i];
+      double amount;
+      if (food.gramsPerUnit != null && food.gramsPerUnit! > 0) {
+        // 按个计的食物给 2 个（鸡蛋/蛋白）
+        amount = food.gramsPerUnit! * 2;
+      } else {
+        // 其他无碳水的食物给 100g
+        amount = 100;
+      }
+      result[i] = amount;
+    }
+
+    return result;
   }
 
   // ─── 交互 ──────────────────────────────────────
