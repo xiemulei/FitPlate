@@ -172,24 +172,18 @@ class _TodayScreenState extends State<TodayScreen> {
     _autoSave();
   }
 
-  /// 核心优化函数：优先满足碳水目标，蛋白质尽力但不强求
+  /// 核心优化函数：先解线性方程组满足碳水，不含碳水的食物按需配蛋白
   List<double> _optimizeGrams(
       List<Food> foods, double targetCarbs, double targetProtein) {
     if (foods.isEmpty) return [];
     final n = foods.length;
 
-    // 提取系数：每克含多少碳水和蛋白
     final c = foods.map((f) => f.carbsPer100G / 100).toList();
     final p = foods.map((f) => f.proteinPer100G / 100).toList();
 
-    // ── 策略：优先满足碳水，蛋白质随缘 ──
-    // 1) 先让含碳水的食物分摊碳水目标
-    // 2) 不含碳水的食物（如鸡蛋），按合理份量配
-    // 3) 最后算实际蛋白质到多少
-
     final result = List.filled(n, 0.0);
 
-    // 找出含碳水的食物索引
+    // 区分含碳水和无碳水的食物
     final carbIdx = <int>[];
     final noCarbIdx = <int>[];
     for (int i = 0; i < n; i++) {
@@ -200,38 +194,55 @@ class _TodayScreenState extends State<TodayScreen> {
       }
     }
 
-    // 分配碳水：按碳水贡献比例分摊
-    if (carbIdx.isNotEmpty) {
-      final totalC = carbIdx.fold(0.0, (s, i) => s + c[i]);
-      // 所有含碳水食物均分碳水目标（克数相同）
-      final grams = targetCarbs / totalC;
-      for (final i in carbIdx) {
-        result[i] = grams.clamp(0.0, 2000.0);
-      }
-    } else {
-      // 没有含碳水的食物，按蛋白质比例分
+    // ── 先处理含碳水的食物 ──
+    if (carbIdx.isEmpty) {
+      // 全是不含碳水的食物（如只选了鸡蛋）→ 按蛋白比例分
       final totalP = p.fold(0.0, (s, v) => s + v);
       if (totalP > 0) {
+        final grams = (targetProtein / totalP).clamp(0.0, 2000.0);
         for (int i = 0; i < n; i++) {
-          result[i] = (targetProtein / totalP).clamp(0.0, 2000.0);
+          result[i] = grams;
         }
       }
       return result;
     }
 
-    // 不含碳水的食物（如鸡蛋）：按合理份量配
-    // 每个配 1-2 份（鸡蛋2个，牛奶1杯等）
-    for (final i in noCarbIdx) {
-      final food = foods[i];
-      double amount;
-      if (food.gramsPerUnit != null && food.gramsPerUnit! > 0) {
-        // 按个计的食物给 2 个（鸡蛋/蛋白）
-        amount = food.gramsPerUnit! * 2;
-      } else {
-        // 其他无碳水的食物给 100g
-        amount = 100;
+    if (carbIdx.length == 1) {
+      // 只有一种含碳水食物 → 直接算，不含碳水的单独算
+      final ci = carbIdx[0];
+      result[ci] = (targetCarbs / c[ci]).clamp(0.0, 2000.0);
+      // 这时的蛋白质贡献 = result[ci] * p[ci]
+      // 剩余蛋白由无碳水食物按比例分
+      final proteinFromCarbs = result[ci] * p[ci];
+      final remainingProtein = (targetProtein - proteinFromCarbs).clamp(0.0, targetProtein);
+      if (noCarbIdx.isNotEmpty && remainingProtein > 0) {
+        final totalNoCarbP = noCarbIdx.fold(0.0, (s, i) => s + p[i]);
+        if (totalNoCarbP > 0) {
+          // 按蛋白密度分配，不超过合理份量
+          for (final i in noCarbIdx) {
+            final grams = (remainingProtein / totalNoCarbP).clamp(0.0, 2000.0);
+            result[i] = grams;
+          }
+        }
       }
-      result[i] = amount;
+    } else {
+      // 多种含碳水食物 → 按碳水密度加权分配
+      final totalC = carbIdx.fold(0.0, (s, i) => s + c[i]);
+      final grams = targetCarbs / totalC;
+      for (final i in carbIdx) {
+        result[i] = grams.clamp(0.0, 2000.0);
+      }
+      // 无碳水食物的蛋白按比例
+      final proteinFromCarbs = carbIdx.fold(0.0, (s, i) => s + result[i] * p[i]);
+      final remainingProtein = (targetProtein - proteinFromCarbs).clamp(0.0, targetProtein);
+      if (noCarbIdx.isNotEmpty && remainingProtein > 0) {
+        final totalNoCarbP = noCarbIdx.fold(0.0, (s, i) => s + p[i]);
+        if (totalNoCarbP > 0) {
+          for (final i in noCarbIdx) {
+            result[i] = (remainingProtein / totalNoCarbP).clamp(0.0, 2000.0);
+          }
+        }
+      }
     }
 
     return result;
