@@ -829,7 +829,7 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
             ],
           ),
-          // 第二行：克数输入 + 营养贡献
+          // 第二行：克数输入 + 单位转换 + 营养贡献
           Row(
             children: [
               SizedBox(
@@ -859,6 +859,20 @@ class _TodayScreenState extends State<TodayScreen> {
               const SizedBox(width: 4),
               Text('g',
                   style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+              // 按食物单位换算显示
+              if (sv.food.unit != FoodUnit.grams100g &&
+                  sv.food.unit != FoodUnit.grams100ml &&
+                  sv.food.gramsPerUnit != null &&
+                  sv.food.gramsPerUnit! > 0 &&
+                  sv.grams > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    '(≈${(sv.grams / sv.food.gramsPerUnit!).round()}${sv.food.unit.label})',
+                    style:
+                        TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  ),
+                ),
               const SizedBox(width: 12),
               Text(
                 '碳水 ${calcCarbs.toStringAsFixed(1)}g',
