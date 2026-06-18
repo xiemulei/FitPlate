@@ -152,23 +152,35 @@ class _TodayScreenState extends State<TodayScreen> {
   // ─── 优化算法 ──────────────────────────────────
 
   /// 自动计算每种食物应该吃多少克，使总碳水和总蛋白质尽量接近目标
-  /// 同时考虑每种食物对碳水和蛋白质的贡献
+  /// 锁定食物固定克数不计入计算，先减去其营养再优化剩余食物
   void _autoDistribute(int mealIdx) {
     final meal = _mealsForDay()?[mealIdx];
     if (meal == null) return;
     final servings = _servings(mealIdx);
     if (servings.isEmpty) return;
 
-    final targetCarbs = meal.carbsG.toDouble();
-    final targetProtein = meal.proteinG.toDouble();
-    final foods = servings.map((s) => s.food).toList();
+    final locked = servings.where((s) => s.locked && s.grams > 0).toList();
+    final unlocked = servings.where((s) => !s.locked).toList();
+    if (unlocked.isEmpty) return;
 
-    final grams = _optimizeGrams(foods, targetCarbs, targetProtein);
+    double targetCarbs = meal.carbsG.toDouble();
+    double targetProtein = meal.proteinG.toDouble();
+
+    // 减去锁定食物的营养贡献
+    for (final ls in locked) {
+      targetCarbs -= ls.food.carbsPer100G / 100 * ls.grams;
+      targetProtein -= ls.food.proteinPer100G / 100 * ls.grams;
+    }
+    targetCarbs = targetCarbs.clamp(0.0, double.infinity);
+    targetProtein = targetProtein.clamp(0.0, double.infinity);
+
+    final unlockedFoods = unlocked.map((s) => s.food).toList();
+    final grams = _optimizeGrams(unlockedFoods, targetCarbs, targetProtein);
 
     setState(() {
-      for (int i = 0; i < servings.length && i < grams.length; i++) {
-        servings[i].grams = grams[i].roundToDouble();
-        servings[i].updateCtrl();
+      for (int i = 0; i < unlocked.length && i < grams.length; i++) {
+        unlocked[i].grams = grams[i].roundToDouble();
+        unlocked[i].updateCtrl();
       }
     });
     _autoSave();
@@ -185,64 +197,54 @@ class _TodayScreenState extends State<TodayScreen> {
 
     final result = List.filled(n, 0.0);
 
-    // 区分含碳水和无碳水的食物
+    // 区分"碳水主食"和"蛋白质源"
+    // 阈值 3g/100g：微量碳水的食物（如鸡蛋 1.5g/100g）归为蛋白质源
+    const carbThreshold = 0.03; // 3g/100g
     final carbIdx = <int>[];
-    final noCarbIdx = <int>[];
+    final proteinIdx = <int>[];
     for (int i = 0; i < n; i++) {
-      if (c[i] > 0) {
+      if (c[i] >= carbThreshold) {
         carbIdx.add(i);
       } else {
-        noCarbIdx.add(i);
+        proteinIdx.add(i);
       }
     }
 
-    // ── 先处理含碳水的食物 ──
+    double proteinFromCarbs = 0;
+
+    // ── 处理碳水主食 ──
     if (carbIdx.isEmpty) {
-      // 全是不含碳水的食物（如只选了鸡蛋）→ 按蛋白比例分
+      // 没有碳水主食（如只选了鸡蛋）→ 按蛋白密度分
       final totalP = p.fold(0.0, (s, v) => s + v);
       if (totalP > 0) {
         final grams = (targetProtein / totalP).clamp(0.0, 2000.0);
-        for (int i = 0; i < n; i++) {
-          result[i] = grams;
-        }
+        for (int i = 0; i < n; i++) result[i] = grams;
       }
       return result;
     }
 
     if (carbIdx.length == 1) {
-      // 只有一种含碳水食物 → 直接算，不含碳水的单独算
+      // 只有一种碳水主食 → 精确求解碳水，剩余蛋白由蛋白质源补齐
       final ci = carbIdx[0];
       result[ci] = (targetCarbs / c[ci]).clamp(0.0, 2000.0);
-      // 这时的蛋白质贡献 = result[ci] * p[ci]
-      // 剩余蛋白由无碳水食物按比例分
-      final proteinFromCarbs = result[ci] * p[ci];
-      final remainingProtein = (targetProtein - proteinFromCarbs).clamp(0.0, targetProtein);
-      if (noCarbIdx.isNotEmpty && remainingProtein > 0) {
-        final totalNoCarbP = noCarbIdx.fold(0.0, (s, i) => s + p[i]);
-        if (totalNoCarbP > 0) {
-          // 按蛋白密度分配，不超过合理份量
-          for (final i in noCarbIdx) {
-            final grams = (remainingProtein / totalNoCarbP).clamp(0.0, 2000.0);
-            result[i] = grams;
-          }
-        }
-      }
+      proteinFromCarbs = result[ci] * p[ci];
     } else {
-      // 多种含碳水食物 → 按碳水密度加权分配
+      // 多种碳水主食 → 按碳水密度加权分配（每份克数相同）
       final totalC = carbIdx.fold(0.0, (s, i) => s + c[i]);
       final grams = targetCarbs / totalC;
       for (final i in carbIdx) {
         result[i] = grams.clamp(0.0, 2000.0);
+        proteinFromCarbs += result[i] * p[i];
       }
-      // 无碳水食物的蛋白按比例
-      final proteinFromCarbs = carbIdx.fold(0.0, (s, i) => s + result[i] * p[i]);
-      final remainingProtein = (targetProtein - proteinFromCarbs).clamp(0.0, targetProtein);
-      if (noCarbIdx.isNotEmpty && remainingProtein > 0) {
-        final totalNoCarbP = noCarbIdx.fold(0.0, (s, i) => s + p[i]);
-        if (totalNoCarbP > 0) {
-          for (final i in noCarbIdx) {
-            result[i] = (remainingProtein / totalNoCarbP).clamp(0.0, 2000.0);
-          }
+    }
+
+    // ── 剩余蛋白由蛋白质源补充 ──
+    final remainingProtein = (targetProtein - proteinFromCarbs).clamp(0.0, targetProtein);
+    if (proteinIdx.isNotEmpty && remainingProtein > 0) {
+      final totalP = proteinIdx.fold(0.0, (s, i) => s + p[i]);
+      if (totalP > 0) {
+        for (final i in proteinIdx) {
+          result[i] = (remainingProtein / totalP).clamp(0.0, 2000.0);
         }
       }
     }
@@ -301,7 +303,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final sv = _servings(i)[idx];
     sv.dispose();
     setState(() {
-      _servings(i)[idx] = _FoodServing(newFood, sv.grams);
+      _servings(i)[idx] = _FoodServing(newFood, sv.grams, locked: sv.locked);
     });
     _autoSave();
   }
@@ -899,7 +901,7 @@ class _TodayScreenState extends State<TodayScreen> {
       ),
       child: Column(
         children: [
-          // 第一行：食物名称 + 切换 + 删除
+          // 第一行：食物名称 + 锁定 + 删除
           Row(
             children: [
               Expanded(
@@ -908,6 +910,22 @@ class _TodayScreenState extends State<TodayScreen> {
                   value: sv.food,
                   color: color,
                   onChanged: (f) => _changeFood(mealIdx, idx, f),
+                ),
+              ),
+              // 锁定/解锁按钮
+              GestureDetector(
+                onTap: () => setState(() {
+                  sv.locked = !sv.locked;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    sv.locked ? Icons.lock : Icons.lock_open,
+                    size: 16,
+                    color: sv.locked
+                        ? Colors.amber
+                        : Colors.grey[400],
+                  ),
                 ),
               ),
               GestureDetector(
@@ -1099,10 +1117,11 @@ class _FoodDropdown extends StatelessWidget {
 class _FoodServing {
   Food food;
   double grams;
+  bool locked;
   late final TextEditingController gramCtrl;
   late final TextEditingController unitCtrl;
 
-  _FoodServing(this.food, this.grams) {
+  _FoodServing(this.food, this.grams, {this.locked = false}) {
     final isUnit = food.unit == FoodUnit.piece &&
         food.gramsPerUnit != null &&
         food.gramsPerUnit! > 0;

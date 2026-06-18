@@ -238,8 +238,8 @@ class PresetFoods {
       name: '鸡蛋（全蛋）',
       unit: FoodUnit.piece,
       gramsPerUnit: 50,
-      proteinPer100G: 13.0,
-      carbsPer100G: 1.5,
+      proteinPer100G: 12.0,
+      carbsPer100G: 0.0,
       category: '蛋白质-纯瘦肉',
     ),
     Food(
