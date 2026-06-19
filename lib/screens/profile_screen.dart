@@ -20,10 +20,10 @@ class ProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _heightCtrl;
   late TextEditingController _weightCtrl;
   late TextEditingController _ageCtrl;
@@ -85,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  void _save() {
+  void save() {
     final h = double.tryParse(_heightCtrl.text) ?? widget.profile.height;
     final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
     final a = int.tryParse(_ageCtrl.text) ?? widget.profile.age;
@@ -105,6 +105,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// 切页时自动保存，不弹提示
+  void silentSave() {
+    final h = double.tryParse(_heightCtrl.text) ?? widget.profile.height;
+    final w = double.tryParse(_weightCtrl.text) ?? widget.profile.weight;
+    final a = int.tryParse(_ageCtrl.text) ?? widget.profile.age;
+    final pk =
+        double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
+    final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
+    final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
+    widget.profile.height = h;
+    widget.profile.weight = w;
+    widget.profile.age = a;
+    widget.profile.proteinPerKg = pk;
+    widget.profile.carbsPerKg = ck;
+    widget.profile.restCarbsPerKg = rck;
+    widget.onProfileChanged(widget.profile);
+  }
+
   void _onGoalChanged(FitnessGoal newGoal) {
     setState(() {
       widget.profile.goal = newGoal;
@@ -120,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _restCarbsKgCtrl.text = widget.profile.restCarbsPerKg.toStringAsFixed(1);
       }
     });
-    _save();
+    save();
   }
 
   /// 根据身高/体重/性别/目标/训练情况查表获取推荐值
@@ -167,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _userTweakedProtein = false;
     _userTweakedCarbs = false;
     setState(() {});
-    _save();
+    save();
   }
 
   void _showRefTable() =>
@@ -218,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.height)),
                                 keyboardType: TextInputType.number,
-                                onChanged: (_) => _save())),
+                                onChanged: (_) {})),
                         const SizedBox(width: 12),
                         Expanded(
                             child: TextField(
@@ -228,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     border: OutlineInputBorder(),
                                     prefixIcon: Icon(Icons.monitor_weight)),
                                 keyboardType: TextInputType.number,
-                                onChanged: (_) => _save())),
+                                onChanged: (_) {})),
                       ]),
                       const SizedBox(height: 12),
                       TextField(
@@ -238,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               border: OutlineInputBorder(),
                               prefixIcon: Icon(Icons.cake)),
                           keyboardType: TextInputType.number,
-                          onChanged: (_) => _save()),
+                          onChanged: (_) {}),
                     ]))),
         const SizedBox(height: 12),
 
@@ -271,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         selected: {p.gender},
                         onSelectionChanged: (set) {
                           setState(() => p.gender = set.first);
-                          _save();
+                          save();
                         },
                       ),
                       const SizedBox(height: 12),
@@ -307,7 +325,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onChanged: (v) {
                             setState(() => p.noStrengthTraining = v);
                             _lookupRecommendation();
-                            _save();
                           },
                           contentPadding: EdgeInsets.zero,
                           dense: true,
@@ -338,7 +355,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onChanged: (v) {
                                 if (v == null) return;
                                 setState(() => p.trainingTime = v);
-                                _save();
                               },
                             ),
                           ),
@@ -401,7 +417,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              _save();
                             },
                           )),
                           const SizedBox(width: 8),
@@ -423,7 +438,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              _save();
                             },
                           )),
                           const SizedBox(width: 8),
@@ -445,7 +459,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              _save();
                             },
                           )),
                         ]),
@@ -470,7 +483,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              _save();
                             },
                           )),
                           const SizedBox(width: 12),
@@ -492,7 +504,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               if (_hasAppliedRecommendation) {
                                 _hasAppliedRecommendation = false;
                               }
-                              _save();
                             },
                           )),
                         ]),

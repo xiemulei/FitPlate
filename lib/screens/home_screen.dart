@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MealTemplate> _templates = [];
   List<TrainingCycle> _cycles = [];
   UserProfile _profile = UserProfile();
+  final _profileKey = GlobalKey<ProfileScreenState>();
 
   @override
   void initState() {
@@ -103,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
         foods: _foods,
         onGoToCycle: () => setState(() => _currentIndex = 3),
         onGoToHistory: _openHistory,
+        onGoToProfile: () => setState(() => _currentIndex = 4),
         profile: _profile,
       ),
       // 标签1：食物库
@@ -124,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       // 标签4：个人
       ProfileScreen(
+        key: _profileKey,
         profile: _profile,
         onProfileChanged: _onProfileChanged,
         foods: _foods,
@@ -141,15 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
             IconButton(
               icon: const Icon(Icons.save),
               tooltip: '保存个人资料',
-              onPressed: () {
-                _onProfileChanged(_profile);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('个人资料已保存'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
+              onPressed: () => _profileKey.currentState?.save(),
             ),
         ],
       ),
@@ -166,7 +161,12 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
+        onDestinationSelected: (i) {
+          if (_currentIndex == 4 && i != 4) {
+            _profileKey.currentState?.silentSave();
+          }
+          setState(() => _currentIndex = i);
+        },
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.today_outlined), label: '今天'),

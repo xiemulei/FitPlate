@@ -15,6 +15,7 @@ class TodayScreen extends StatefulWidget {
   final List<Food> foods;
   final VoidCallback onGoToCycle;
   final VoidCallback onGoToHistory;
+  final VoidCallback? onGoToProfile;
   final UserProfile? profile;
 
   const TodayScreen({
@@ -24,6 +25,7 @@ class TodayScreen extends StatefulWidget {
     required this.foods,
     required this.onGoToCycle,
     required this.onGoToHistory,
+    this.onGoToProfile,
     this.profile,
   });
 
@@ -417,6 +419,9 @@ class _TodayScreenState extends State<TodayScreen> {
 
               const SizedBox(height: 12),
 
+              // ── 新用户引导 ──
+              _buildSetupChecklist(theme),
+
               // ── 今日餐单 ──
               if (meals != null && meals.isNotEmpty) ...[
                 Card(
@@ -471,6 +476,108 @@ class _TodayScreenState extends State<TodayScreen> {
       count += sv.length;
     }
     return count;
+  }
+
+  bool get _isProfileSetUp {
+    final p = widget.profile;
+    if (p == null) return false;
+    // 用户修改过默认值就算完成设置
+    return p.weight != 70 || p.height != 170;
+  }
+
+  Widget _buildSetupChecklist(ThemeData theme) {
+    final hasCycle = _activeCycle != null;
+    final hasFood = _allSelectedCount > 0;
+    final allDone = _isProfileSetUp && hasCycle && hasFood;
+    if (allDone) return const SizedBox.shrink();
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Text('🚀', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 8),
+              Text('开始使用',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: theme.colorScheme.onPrimaryContainer)),
+              const Spacer(),
+              Text(
+                  '${[_isProfileSetUp, hasCycle, hasFood].where((v) => v).length}/3',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onPrimaryContainer
+                          .withValues(alpha: 0.6))),
+            ]),
+            const SizedBox(height: 8),
+            _checkItem(
+              icon: Icons.person,
+              label: '填写身体数据',
+              done: _isProfileSetUp,
+              onTap: widget.onGoToProfile,
+            ),
+            _checkItem(
+              icon: Icons.loop,
+              label: '创建训练循环',
+              done: hasCycle,
+              onTap: widget.onGoToCycle,
+            ),
+            _checkItem(
+              icon: Icons.restaurant,
+              label: '今天选食物',
+              done: hasFood,
+              onTap: null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _checkItem({
+    required IconData icon,
+    required String label,
+    required bool done,
+    VoidCallback? onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              Icon(icon,
+                  size: 16,
+                  color: done ? Colors.green : Colors.grey[500]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: done ? Colors.grey[400] : Colors.grey[700],
+                      decoration:
+                          done ? TextDecoration.lineThrough : null,
+                    )),
+              ),
+              if (done)
+                const Icon(Icons.check_circle,
+                    size: 18, color: Colors.green)
+              else if (onTap != null)
+                Icon(Icons.arrow_forward_ios,
+                    size: 14, color: Colors.grey[400]),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDailySummary(List<MealPlanEntry> meals, ThemeData theme) {

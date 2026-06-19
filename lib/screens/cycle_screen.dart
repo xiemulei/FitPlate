@@ -301,6 +301,7 @@ class _CycleScreenState extends State<CycleScreen> {
           ...widget.cycles.map((cycle) => _CycleCard(
                 cycle: cycle,
                 templates: widget.templates,
+                profile: widget.profile,
                 theme: theme,
                 onTap: () => _editCycle(cycle),
                 onToggle: () => _toggleActive(cycle),
@@ -316,6 +317,7 @@ class _CycleScreenState extends State<CycleScreen> {
 class _CycleCard extends StatelessWidget {
   final TrainingCycle cycle;
   final List<MealTemplate> templates;
+  final UserProfile? profile;
   final ThemeData theme;
   final VoidCallback onTap;
   final VoidCallback onToggle;
@@ -326,6 +328,7 @@ class _CycleCard extends StatelessWidget {
   const _CycleCard({
     required this.cycle,
     required this.templates,
+    required this.profile,
     required this.theme,
     required this.onTap,
     required this.onToggle,
@@ -450,6 +453,9 @@ class _CycleCard extends StatelessWidget {
             ),
           ],
 
+          // Nutrition target summary
+          if (profile != null) _buildNutritionRow(),
+
           // Day indicators
           InkWell(
             onTap: onTap,
@@ -548,6 +554,28 @@ class _CycleCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNutritionRow() {
+    final p = profile!;
+    final trainCarbs = (p.weight * p.carbsPerKg).round();
+    final restCarbs = (p.weight * p.restCarbsPerKg).round();
+    final protein = (p.weight * p.proteinPerKg).round();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 9),
+      child: Row(
+        children: [
+          Icon(Icons.local_fire_department, size: 14, color: Colors.grey[400]),
+          const SizedBox(width: 4),
+          Text('🏋️ C${trainCarbs}g P${protein}g',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+          const SizedBox(width: 10),
+          Text('😴 C${restCarbs}g P${protein}g',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
         ],
       ),
     );

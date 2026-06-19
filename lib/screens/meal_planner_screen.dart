@@ -131,7 +131,11 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
                 children: [
                   Icon(Icons.restaurant_menu, size: 64, color: Colors.grey[600]),
                   const SizedBox(height: 16),
-                  Text('还没有配餐方案', style: TextStyle(color: Colors.grey[400], fontSize: 16)),
+                  Text('暂无自定义方案',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text('每日配餐已在「今天」标签页自动生成',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                   const SizedBox(height: 24),
                   FilledButton.icon(
                     onPressed: () => _openEditor(),
@@ -144,6 +148,29 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // 说明
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.12)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 18, color: Colors.blue[300]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '每日配餐在「今天」标签页自动生成。\n此处可创建自定义配餐方案模板。',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey[600], height: 1.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 // 预设方案
                 _sectionHeader('预设方案', Icons.auto_awesome, Colors.blue),
                 ...builtIn.map((t) => _builtInCard(t)),
