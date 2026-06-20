@@ -5,6 +5,7 @@ class FoodServingRecord {
   double grams;
   double carbsPer100G;
   double proteinPer100G;
+  bool locked;
 
   FoodServingRecord({
     required this.foodId,
@@ -12,6 +13,7 @@ class FoodServingRecord {
     required this.grams,
     required this.carbsPer100G,
     required this.proteinPer100G,
+    this.locked = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -20,6 +22,7 @@ class FoodServingRecord {
         'grams': grams,
         'carbsPer100G': carbsPer100G,
         'proteinPer100G': proteinPer100G,
+        if (locked) 'locked': true,
       };
 
   factory FoodServingRecord.fromJson(Map<String, dynamic> j) =>
@@ -29,6 +32,7 @@ class FoodServingRecord {
         grams: (j['grams'] as num).toDouble(),
         carbsPer100G: (j['carbsPer100G'] as num).toDouble(),
         proteinPer100G: (j['proteinPer100G'] as num).toDouble(),
+        locked: j['locked'] == true,
       );
 }
 

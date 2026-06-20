@@ -103,6 +103,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   grams: s.grams,
                   carbsPer100G: s.food.carbsPer100G,
                   proteinPer100G: s.food.proteinPer100G,
+                  locked: s.locked,
                 ))
             .toList(),
       ));
@@ -1133,7 +1134,7 @@ class _FoodServing {
   static _FoodServing? fromRecord(FoodServingRecord rec, List<Food> allFoods) {
     final food = allFoods.where((f) => f.id == rec.foodId).firstOrNull;
     if (food == null) return null;
-    return _FoodServing(food, rec.grams);
+    return _FoodServing(food, rec.grams, locked: rec.locked);
   }
 
   void updateCtrl() {
