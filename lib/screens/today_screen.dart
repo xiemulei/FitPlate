@@ -1259,7 +1259,7 @@ class _AllFoodPickerState extends State<_AllFoodPicker> {
                             style: const TextStyle(
                                 fontWeight: FontWeight.w500, fontSize: 14)),
                         subtitle: Text(
-                          '每100g: 碳水${f.carbsPer100G.toStringAsFixed(1)}g · 蛋白${f.proteinPer100G.toStringAsFixed(1)}g',
+                          f.nutritionLabel,
                           style:
                               TextStyle(fontSize: 11, color: Colors.grey[500]),
                         ),

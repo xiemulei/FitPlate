@@ -66,6 +66,30 @@ class Food {
     return 100.0;
   }
 
+  /// 按件计的食物，每件的蛋白质含量（如 1个鸡蛋=6g蛋白）
+  double get proteinPerUnit {
+    if (gramsPerUnit != null && gramsPerUnit! > 0) {
+      return proteinPer100G / 100 * gramsPerUnit!;
+    }
+    return proteinPer100G;
+  }
+
+  /// 按件计的食物，每件的碳水化合物含量
+  double get carbsPerUnit {
+    if (gramsPerUnit != null && gramsPerUnit! > 0) {
+      return carbsPer100G / 100 * gramsPerUnit!;
+    }
+    return carbsPer100G;
+  }
+
+  /// 营养数据展示文本
+  String get nutritionLabel {
+    if (unit.isItemUnit && gramsPerUnit != null && gramsPerUnit! > 0) {
+      return '每个: 蛋白${proteinPerUnit.toStringAsFixed(1)}g · 碳水${carbsPerUnit.toStringAsFixed(1)}g';
+    }
+    return '每100g: 蛋白${proteinPer100G.toStringAsFixed(1)}g · 碳水${carbsPer100G.toStringAsFixed(1)}g';
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

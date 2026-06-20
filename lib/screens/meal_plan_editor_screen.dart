@@ -705,7 +705,7 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
           ],
         ]),
         subtitle: Text(
-          '每100g: 蛋白${food.proteinPer100G.toStringAsFixed(1)}g · 碳水${food.carbsPer100G.toStringAsFixed(1)}g',
+          food.nutritionLabel,
           style: TextStyle(fontSize: 10, color: Colors.grey[500]),
         ),
         trailing: isSel

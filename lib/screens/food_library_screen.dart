@@ -304,7 +304,7 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
           ],
         ),
         subtitle: Text(
-          '蛋白质 ${food.proteinPer100G.toStringAsFixed(1)}  碳水 ${food.carbsPer100G.toStringAsFixed(1)}',
+          food.nutritionLabel,
           style: TextStyle(color: Colors.grey[400], fontSize: 13),
         ),
         trailing: const Icon(Icons.chevron_right, size: 18),
