@@ -58,6 +58,12 @@ class _TodayScreenState extends State<TodayScreen> {
     final active = _activeCycle;
     if (active == null) return;
 
+    // 每轮循环开始自动清空上一轮的覆盖
+    if (active.todayIndex == 0 && active.overrides.isNotEmpty) {
+      active.clearOverrides();
+      await StorageService.saveCycles(widget.cycles);
+    }
+
     final todayStr = DailyFoodLog.todayDate();
     final log = await StorageService.loadDailyLog(todayStr);
 
@@ -118,6 +124,15 @@ class _TodayScreenState extends State<TodayScreen> {
       meals: mealLogs,
     );
     await StorageService.saveDailyLog(log);
+  }
+
+  /// 保存循环状态（包括临时覆盖）到存储
+  Future<void> _saveCycle(TrainingCycle cycle) async {
+    final all = List<TrainingCycle>.from(widget.cycles);
+    final idx = all.indexWhere((c) => c.id == cycle.id);
+    if (idx == -1) return;
+    all[idx] = cycle;
+    await StorageService.saveCycles(all);
   }
 
   TrainingCycle? get _activeCycle =>
@@ -379,6 +394,15 @@ class _TodayScreenState extends State<TodayScreen> {
                               style: theme.textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
+                            if (active.isTodayOverridden) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.edit, size: 14, color: Colors.amber[700]),
+                              Text('已覆盖',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.amber[700],
+                                      fontWeight: FontWeight.w500)),
+                            ],
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -387,13 +411,74 @@ class _TodayScreenState extends State<TodayScreen> {
                                 color: theme.colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Text(
-                                'D${(active.todayIndex ?? 0) + 1} · ${active.name}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.primary,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'D${(active.todayIndex ?? 0) + 1} · ${active.name}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  PopupMenuButton<DayOverrideType>(
+                                    padding: EdgeInsets.zero,
+                                    icon: Icon(
+                                      active.isTodayOverridden
+                                          ? Icons.edit
+                                          : Icons.arrow_drop_down,
+                                      size: 16,
+                                      color: active.isTodayOverridden
+                                          ? Colors.amber
+                                          : theme.colorScheme.primary,
+                                    ),
+                                    tooltip: '临时修改今日类型',
+                                    onSelected: (value) {
+                                      setState(() {
+                                        if (active.isTodayOverridden &&
+                                            value ==
+                                                DayOverrideType.rest) {
+                                          active.overrides
+                                              .remove(active.todayIndex!);
+                                        } else {
+                                          active.overrides[
+                                              active.todayIndex!] = value;
+                                        }
+                                      });
+                                      _saveCycle(active);
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      if (active.isTodayOverridden)
+                                        const PopupMenuItem(
+                                          value: null,
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.undo,
+                                                  size: 18,
+                                                  color: Colors.blue),
+                                              SizedBox(width: 8),
+                                              Text('恢复模板计划'),
+                                            ],
+                                          ),
+                                        ),
+                                      if (!isRestDay)
+                                        const PopupMenuItem(
+                                          value: DayOverrideType.rest,
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.bedtime,
+                                                  size: 18,
+                                                  color: Colors.orange),
+                                              SizedBox(width: 8),
+                                              Text('设为休息日'),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ],

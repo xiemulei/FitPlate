@@ -43,6 +43,9 @@ class CycleDay {
       );
 }
 
+/// 单日覆盖类型
+enum DayOverrideType { rest }
+
 class TrainingCycle {
   String id;
   String name;
@@ -51,6 +54,7 @@ class TrainingCycle {
   String? startDate;
   bool isActive;
   TrainingTime? trainingTime; // 覆盖 UserProfile 中的训练时间设置
+  Map<int, DayOverrideType> overrides; // dayIndex → 覆盖类型
 
   TrainingCycle({
     required this.id,
@@ -60,7 +64,8 @@ class TrainingCycle {
     this.startDate,
     this.isActive = false,
     this.trainingTime,
-  });
+    Map<int, DayOverrideType>? overrides,
+  }) : overrides = overrides ?? {};
 
   TrainingCycle copyWith({
     String? id,
@@ -70,6 +75,7 @@ class TrainingCycle {
     String? startDate,
     bool? isActive,
     TrainingTime? trainingTime,
+    Map<int, DayOverrideType>? overrides,
   }) {
     return TrainingCycle(
       id: id ?? this.id,
@@ -79,6 +85,7 @@ class TrainingCycle {
       startDate: startDate ?? this.startDate,
       isActive: isActive ?? this.isActive,
       trainingTime: trainingTime ?? this.trainingTime,
+      overrides: overrides ?? Map<int, DayOverrideType>.from(this.overrides),
     );
   }
 
@@ -92,11 +99,21 @@ class TrainingCycle {
     return diff % cycleLength;
   }
 
+  /// 今天的日类型（考虑临时覆盖）
   CycleDay? get todayDay {
     final idx = todayIndex;
     if (idx == null || idx >= days.length) return null;
-    return days[idx];
+    final day = days[idx];
+    final ov = overrides[idx];
+    if (ov == DayOverrideType.rest) {
+      return day.copyWith(isRestDay: true, label: '休息');
+    }
+    return day;
   }
+
+  /// 今天是否被覆盖为休息
+  bool get isTodayOverridden =>
+      todayIndex != null && overrides.containsKey(todayIndex!);
 
   String? get todayTemplateId => todayDay?.mealTemplateId;
 
@@ -113,6 +130,11 @@ class TrainingCycle {
     return (idx + 1) / cycleLength;
   }
 
+  /// 清理所有覆盖（每轮循环结束后调用）
+  void clearOverrides() {
+    overrides.clear();
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -121,20 +143,32 @@ class TrainingCycle {
         'startDate': startDate,
         'isActive': isActive,
         'trainingTime': trainingTime?.name,
+        if (overrides.isNotEmpty)
+          'overrides': overrides.map((k, v) => MapEntry(k.toString(), v.name)),
       };
 
-  factory TrainingCycle.fromJson(Map<String, dynamic> j) => TrainingCycle(
-        id: j['id'],
-        name: j['name'],
-        cycleLength: j['cycleLength'],
-        days: (j['days'] as List).map((d) => CycleDay.fromJson(d)).toList(),
-        startDate: j['startDate'],
-        isActive: j['isActive'] ?? false,
-        trainingTime: j['trainingTime'] != null
-            ? TrainingTime.values.firstWhere(
-                (t) => t.name == j['trainingTime'],
-                orElse: () => TrainingTime.afterLunch,
-              )
-            : null,
-      );
+  factory TrainingCycle.fromJson(Map<String, dynamic> j) {
+    final rawOverrides = j['overrides'] as Map<String, dynamic>?;
+    return TrainingCycle(
+      id: j['id'],
+      name: j['name'],
+      cycleLength: j['cycleLength'],
+      days: (j['days'] as List).map((d) => CycleDay.fromJson(d)).toList(),
+      startDate: j['startDate'],
+      isActive: j['isActive'] ?? false,
+      trainingTime: j['trainingTime'] != null
+          ? TrainingTime.values.firstWhere(
+              (t) => t.name == j['trainingTime'],
+              orElse: () => TrainingTime.afterLunch,
+            )
+          : null,
+      overrides: rawOverrides != null
+          ? rawOverrides.map((k, v) =>
+              MapEntry(int.parse(k), DayOverrideType.values.firstWhere(
+                (t) => t.name == v,
+                orElse: () => DayOverrideType.rest,
+              )))
+          : {},
+    );
+  }
 }
