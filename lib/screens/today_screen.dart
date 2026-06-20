@@ -915,9 +915,12 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
               // 锁定/解锁按钮
               GestureDetector(
-                onTap: () => setState(() {
-                  sv.locked = !sv.locked;
-                }),
+                onTap: () {
+                  setState(() {
+                    sv.locked = !sv.locked;
+                  });
+                  _autoSave();
+                },
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   child: Icon(
