@@ -30,6 +30,7 @@ class ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _proteinKgCtrl;
   late TextEditingController _carbsKgCtrl;
   late TextEditingController _restCarbsKgCtrl;
+  late TextEditingController _fatKgCtrl;
 
   // 标记用户是否手动调整过每千克值（切换目标时不覆盖）
   bool _userTweakedProtein = false;
@@ -52,6 +53,8 @@ class ProfileScreenState extends State<ProfileScreen> {
     _carbsKgCtrl = TextEditingController(text: p.carbsPerKg.toStringAsFixed(1));
     _restCarbsKgCtrl =
         TextEditingController(text: p.restCarbsPerKg.toStringAsFixed(1));
+    _fatKgCtrl =
+        TextEditingController(text: p.fatPerKg.toStringAsFixed(1));
     // 页面恢复时自动查表推荐
     _lookupRecommendation();
   }
@@ -67,6 +70,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       _proteinKgCtrl.text = p.proteinPerKg.toStringAsFixed(1);
       _carbsKgCtrl.text = p.carbsPerKg.toStringAsFixed(1);
       _restCarbsKgCtrl.text = p.restCarbsPerKg.toStringAsFixed(1);
+      _fatKgCtrl.text = p.fatPerKg.toStringAsFixed(1);
       _userTweakedProtein = false;
       _userTweakedCarbs = false;
       _hasAppliedRecommendation = false;
@@ -82,6 +86,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     _proteinKgCtrl.dispose();
     _carbsKgCtrl.dispose();
     _restCarbsKgCtrl.dispose();
+    _fatKgCtrl.dispose();
     super.dispose();
   }
 
@@ -93,12 +98,14 @@ class ProfileScreenState extends State<ProfileScreen> {
         double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
     final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
     final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
+    final fk = double.tryParse(_fatKgCtrl.text) ?? widget.profile.fatPerKg;
     widget.profile.height = h;
     widget.profile.weight = w;
     widget.profile.age = a;
     widget.profile.proteinPerKg = pk;
     widget.profile.carbsPerKg = ck;
     widget.profile.restCarbsPerKg = rck;
+    widget.profile.fatPerKg = fk;
     widget.onProfileChanged(widget.profile);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('个人资料已保存')),
@@ -114,12 +121,14 @@ class ProfileScreenState extends State<ProfileScreen> {
         double.tryParse(_proteinKgCtrl.text) ?? widget.profile.proteinPerKg;
     final ck = double.tryParse(_carbsKgCtrl.text) ?? widget.profile.carbsPerKg;
     final rck = double.tryParse(_restCarbsKgCtrl.text) ?? widget.profile.restCarbsPerKg;
+    final fk = double.tryParse(_fatKgCtrl.text) ?? widget.profile.fatPerKg;
     widget.profile.height = h;
     widget.profile.weight = w;
     widget.profile.age = a;
     widget.profile.proteinPerKg = pk;
     widget.profile.carbsPerKg = ck;
     widget.profile.restCarbsPerKg = rck;
+    widget.profile.fatPerKg = fk;
     widget.onProfileChanged(widget.profile);
   }
 
@@ -508,6 +517,26 @@ class ProfileScreenState extends State<ProfileScreen> {
                           )),
                         ]),
                       ],
+                      // 脂肪（统一放一行，力训/无力训都显示）
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        Expanded(
+                            child: TextField(
+                          controller: _fatKgCtrl,
+                          decoration: const InputDecoration(
+                            labelText: '脂肪上限 (g/kg)',
+                            hintText: '默认 0.8',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.water_drop),
+                            isDense: true,
+                            helperText: '超上限时今日页面提示',
+                            helperStyle: TextStyle(fontSize: 11),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                        )),
+                        const Spacer(),
+                      ]),
                       // 查表推荐提示
                       if (_recommendationNote != null) ...[
                         const SizedBox(height: 12),

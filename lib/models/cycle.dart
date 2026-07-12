@@ -135,6 +135,13 @@ class TrainingCycle {
     overrides.clear();
   }
 
+  /// 重置循环：回到第一天开始
+  void resetIndex() {
+    final n = DateTime.now();
+    startDate = '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+    overrides.clear();
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,

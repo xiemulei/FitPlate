@@ -48,7 +48,7 @@ class TemplateMealCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '目标 ${template.target.protein.toStringAsFixed(0)}P / ${template.target.carbs.toStringAsFixed(0)}C',
+                    '目标 ${template.target.carbs.toStringAsFixed(0)}C / ${template.target.protein.toStringAsFixed(0)}P',
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,

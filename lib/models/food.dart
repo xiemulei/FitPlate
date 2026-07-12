@@ -32,11 +32,14 @@ class Food {
   final FoodUnit unit;
   final double proteinPer100G;
   final double carbsPer100G;
+  final double fatPer100G;
   final String category; // 分类，使用 FoodCategory 常量
   final String? subcategory; // 主食子类，使用 FoodCategory.Subcategory 常量
   /// 对于"个/份/杯"等按件计量的单位，每件相当于多少克
   /// 例如：1个鸡蛋=50g，1份米饭=200g，1杯牛奶=250ml
   final double? gramsPerUnit;
+  /// 优先级 0~10，数字越小越靠前（选择食物时排序用）
+  final int priority;
 
   Food({
     required this.id,
@@ -44,9 +47,11 @@ class Food {
     this.unit = FoodUnit.grams100g,
     required this.proteinPer100G,
     required this.carbsPer100G,
+    this.fatPer100G = 0,
     this.category = FoodCategory.uncategorized,
     this.subcategory,
     this.gramsPerUnit,
+    this.priority = 5,
   });
 
   /// 显示单位文本（如 "g/100g", "个"）
@@ -82,12 +87,20 @@ class Food {
     return carbsPer100G;
   }
 
+  /// 按件计的食物，每件的脂肪含量
+  double get fatPerUnit {
+    if (gramsPerUnit != null && gramsPerUnit! > 0) {
+      return fatPer100G / 100 * gramsPerUnit!;
+    }
+    return fatPer100G;
+  }
+
   /// 营养数据展示文本
   String get nutritionLabel {
     if (unit.isItemUnit && gramsPerUnit != null && gramsPerUnit! > 0) {
-      return '每个: 蛋白${proteinPerUnit.toStringAsFixed(1)}g · 碳水${carbsPerUnit.toStringAsFixed(1)}g';
+      return '每个: 碳水${carbsPerUnit.toStringAsFixed(1)}g · 蛋白${proteinPerUnit.toStringAsFixed(1)}g · 脂肪${fatPerUnit.toStringAsFixed(1)}g';
     }
-    return '每100g: 蛋白${proteinPer100G.toStringAsFixed(1)}g · 碳水${carbsPer100G.toStringAsFixed(1)}g';
+    return '每100g: 碳水${carbsPer100G.toStringAsFixed(1)}g · 蛋白${proteinPer100G.toStringAsFixed(1)}g · 脂肪${fatPer100G.toStringAsFixed(1)}g';
   }
 
   Map<String, dynamic> toJson() => {
@@ -96,9 +109,11 @@ class Food {
         'unit': unit.label,
         'proteinPer100G': proteinPer100G,
         'carbsPer100G': carbsPer100G,
+        'fatPer100G': fatPer100G,
         'category': category,
         'subcategory': subcategory,
         if (gramsPerUnit != null) 'gramsPerUnit': gramsPerUnit,
+        if (priority != 5) 'priority': priority,
       };
 
   factory Food.fromJson(Map<String, dynamic> j) => Food(
@@ -109,9 +124,11 @@ class Food {
             : FoodUnit.grams100g,
         proteinPer100G: (j['proteinPer100G'] as num).toDouble(),
         carbsPer100G: (j['carbsPer100G'] as num).toDouble(),
+        fatPer100G: (j['fatPer100G'] as num?)?.toDouble() ?? 0,
         category: j['category'] ?? FoodCategory.uncategorized,
         subcategory: j['subcategory'],
         gramsPerUnit: (j['gramsPerUnit'] as num?)?.toDouble(),
+        priority: (j['priority'] as int?) ?? 5,
       );
 
   /// 分类标签（含子类），用于显示

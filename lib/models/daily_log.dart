@@ -5,6 +5,7 @@ class FoodServingRecord {
   double grams;
   double carbsPer100G;
   double proteinPer100G;
+  double fatPer100G;
   bool locked;
 
   FoodServingRecord({
@@ -13,6 +14,7 @@ class FoodServingRecord {
     required this.grams,
     required this.carbsPer100G,
     required this.proteinPer100G,
+    this.fatPer100G = 0,
     this.locked = false,
   });
 
@@ -22,6 +24,7 @@ class FoodServingRecord {
         'grams': grams,
         'carbsPer100G': carbsPer100G,
         'proteinPer100G': proteinPer100G,
+        if (fatPer100G > 0) 'fatPer100G': fatPer100G,
         if (locked) 'locked': true,
       };
 
@@ -32,6 +35,7 @@ class FoodServingRecord {
         grams: (j['grams'] as num).toDouble(),
         carbsPer100G: (j['carbsPer100G'] as num).toDouble(),
         proteinPer100G: (j['proteinPer100G'] as num).toDouble(),
+        fatPer100G: (j['fatPer100G'] as num?)?.toDouble() ?? 0,
         locked: j['locked'] == true,
       );
 }

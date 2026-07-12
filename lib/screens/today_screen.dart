@@ -33,11 +33,13 @@ class TodayScreen extends StatefulWidget {
   State<TodayScreen> createState() => _TodayScreenState();
 }
 
-class _TodayScreenState extends State<TodayScreen> {
+class _TodayScreenState extends State<TodayScreen>
+    with WidgetsBindingObserver {
   // 每餐的食物选择 — keyed by "mealIndex"
   final Map<int, List<_FoodServing>> _selections = {};
   int? _expandedMealIndex;
   bool _loaded = false;
+  String _lastLoadedDate = '';
 
   @override
   void didUpdateWidget(TodayScreen old) {
@@ -50,7 +52,25 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadTodayLog();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App 从后台恢复 → 重新检查日期是否变化
+      final todayStr = DailyFoodLog.todayDate();
+      if (_lastLoadedDate != todayStr) {
+        _loadTodayLog();
+      }
+    }
   }
 
   /// 加载今天已保存的饮食记录
@@ -58,13 +78,17 @@ class _TodayScreenState extends State<TodayScreen> {
     final active = _activeCycle;
     if (active == null) return;
 
+    final todayStr = DailyFoodLog.todayDate();
+
+    // 日期变了 → 清空上一日的内存数据
+    _lastLoadedDate = todayStr;
+
     // 每轮循环开始自动清空上一轮的覆盖
     if (active.todayIndex == 0 && active.overrides.isNotEmpty) {
       active.clearOverrides();
       await StorageService.saveCycles(widget.cycles);
     }
 
-    final todayStr = DailyFoodLog.todayDate();
     final log = await StorageService.loadDailyLog(todayStr);
 
     if (log != null && mounted) {
@@ -83,7 +107,10 @@ class _TodayScreenState extends State<TodayScreen> {
         _loaded = true;
       });
     } else if (mounted) {
-      setState(() => _loaded = true);
+      setState(() {
+        _selections.clear();
+        _loaded = true;
+      });
     }
   }
 
@@ -109,6 +136,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   grams: s.grams,
                   carbsPer100G: s.food.carbsPer100G,
                   proteinPer100G: s.food.proteinPer100G,
+                  fatPer100G: s.food.fatPer100G,
                   locked: s.locked,
                 ))
             .toList(),
@@ -143,15 +171,16 @@ class _TodayScreenState extends State<TodayScreen> {
   List<_FoodServing> _servings(int mealIdx) =>
       _selections.putIfAbsent(mealIdx, () => []);
 
-  /// 计算某餐所有已选食物的实际碳水和蛋白质
-  ({double carbs, double protein, double grams}) _calcTotals(int mealIdx) {
-    double carbs = 0, protein = 0, grams = 0;
+  /// 计算某餐所有已选食物的实际碳水和蛋白质和脂肪
+  ({double carbs, double protein, double fat, double grams}) _calcTotals(int mealIdx) {
+    double carbs = 0, protein = 0, fat = 0, grams = 0;
     for (final s in _servings(mealIdx)) {
       grams += s.grams;
       carbs += s.food.carbsPer100G / 100 * s.grams;
       protein += s.food.proteinPer100G / 100 * s.grams;
+      fat += s.food.fatPer100G / 100 * s.grams;
     }
-    return (carbs: carbs, protein: protein, grams: grams);
+    return (carbs: carbs, protein: protein, fat: fat, grams: grams);
   }
 
   List<MealPlanEntry>? _mealsForDay() {
@@ -220,7 +249,13 @@ class _TodayScreenState extends State<TodayScreen> {
     final proteinIdx = <int>[];
     for (int i = 0; i < n; i++) {
       if (c[i] >= carbThreshold) {
-        carbIdx.add(i);
+        // 有显著碳水 → 还要看它是不是「蛋白质为主」的食物
+        // 例：蛋白粉 75g蛋白+10g碳水，蛋白是碳水的 7.5 倍 → 应归为蛋白源
+        if (p[i] > c[i] * 3) {
+          proteinIdx.add(i);
+        } else {
+          carbIdx.add(i);
+        }
       } else {
         proteinIdx.add(i);
       }
@@ -362,6 +397,13 @@ class _TodayScreenState extends State<TodayScreen> {
     final meals = _mealsForDay();
     final totalCarbs = meals?.fold(0, (s, e) => s + e.carbsG) ?? 0;
     final totalProtein = meals?.fold(0, (s, e) => s + e.proteinG) ?? 0;
+    // 计算今日实际脂肪（已选食物）
+    double todayFat = 0;
+    for (final svList in _selections.values) {
+      for (final sv in svList) {
+        todayFat += sv.food.fatPer100G / 100 * sv.grams;
+      }
+    }
 
     return !_loaded
         ? const Center(child: CircularProgressIndicator())
@@ -423,7 +465,7 @@ class _TodayScreenState extends State<TodayScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 2),
-                                  PopupMenuButton<DayOverrideType>(
+                                  PopupMenuButton<Object>(
                                     padding: EdgeInsets.zero,
                                     icon: Icon(
                                       active.isTodayOverridden
@@ -436,18 +478,48 @@ class _TodayScreenState extends State<TodayScreen> {
                                     ),
                                     tooltip: '临时修改今日类型',
                                     onSelected: (value) {
-                                      setState(() {
-                                        if (active.isTodayOverridden &&
-                                            value ==
-                                                DayOverrideType.rest) {
-                                          active.overrides
-                                              .remove(active.todayIndex!);
-                                        } else {
-                                          active.overrides[
-                                              active.todayIndex!] = value;
-                                        }
-                                      });
-                                      _saveCycle(active);
+                                      if (value is DayOverrideType) {
+                                        setState(() {
+                                          if (active.isTodayOverridden &&
+                                              value ==
+                                                  DayOverrideType.rest) {
+                                            active.overrides
+                                                .remove(active.todayIndex!);
+                                          } else {
+                                            active.overrides[
+                                                active.todayIndex!] = value;
+                                          }
+                                        });
+                                        _saveCycle(active);
+                                      } else if (value == 'reset_cycle') {
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('重置循环'),
+                                            content: Text(
+                                                '将「${active.name}」重置到第一天（D1），\n当前进度将丢失，确定吗？'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx),
+                                                child: const Text('取消'),
+                                              ),
+                                              FilledButton(
+                                                onPressed: () {
+                                                  Navigator.pop(ctx);
+                                                  setState(() {
+                                                    active.overrides
+                                                        .clear();
+                                                    active.resetIndex();
+                                                  });
+                                                  _saveCycle(active);
+                                                },
+                                                child: const Text('重置'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
                                     },
                                     itemBuilder: (ctx) => [
                                       if (active.isTodayOverridden)
@@ -476,6 +548,21 @@ class _TodayScreenState extends State<TodayScreen> {
                                             ],
                                           ),
                                         ),
+                                      const PopupMenuDivider(),
+                                      const PopupMenuItem(
+                                        value: 'reset_cycle',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.restart_alt,
+                                                size: 18,
+                                                color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('重置循环',
+                                                style: TextStyle(
+                                                    color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -489,7 +576,7 @@ class _TodayScreenState extends State<TodayScreen> {
                             Icon(Icons.wifi_tethering,
                                 size: 12, color: Colors.grey[400]),
                             const SizedBox(width: 4),
-                            Text('共 $totalCarbs g碳水 · $totalProtein g蛋白质',
+                            Text('共 $totalCarbs g碳水 · $totalProtein g蛋白质 · ${todayFat.toStringAsFixed(0)} g脂肪',
                                 style: TextStyle(
                                     color: Colors.grey[400], fontSize: 12)),
                           ],
@@ -669,12 +756,13 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   Widget _buildDailySummary(List<MealPlanEntry> meals, ThemeData theme) {
-    double totalCarbs = 0, totalProtein = 0, totalGrams = 0;
+    double totalCarbs = 0, totalProtein = 0, totalFat = 0, totalGrams = 0;
     int mealsWithFood = 0;
     for (final entry in _selections.entries) {
       for (final sv in entry.value) {
         totalCarbs += sv.food.carbsPer100G / 100 * sv.grams;
         totalProtein += sv.food.proteinPer100G / 100 * sv.grams;
+        totalFat += sv.food.fatPer100G / 100 * sv.grams;
         totalGrams += sv.grams;
       }
       if (entry.value.isNotEmpty) mealsWithFood++;
@@ -711,9 +799,38 @@ class _TodayScreenState extends State<TodayScreen> {
                     '蛋白质', totalProtein, meals.fold(0, (s, e) => s + e.proteinG).toDouble(),
                     Colors.green),
                 const SizedBox(width: 16),
+                // 脂肪 — 按体重估算上限，超出提示
+                _buildFatSummary(totalFat),
+                const SizedBox(width: 16),
                 _summaryItemG('食物量', totalGrams, Colors.grey),
               ],
             ),
+            // 脂肪超量提示
+            if (widget.profile != null && totalFat > _fatUpperLimit) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 16, color: Colors.red[700]),
+                    const SizedBox(width: 6),
+                    Text(
+                      '脂肪摄入偏高（建议 ≤ ${_fatUpperLimit}g）',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[700],
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -746,6 +863,57 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
           const SizedBox(height: 2),
           Text(label,
+              style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+        ],
+      ),
+    );
+  }
+
+  /// 脂肪上限（按个人资料中的 fatPerKg 计算）
+  double get _fatUpperLimit {
+    final p = widget.profile;
+    if (p != null) return p.dailyFat;
+    return 56; // fallback: 70 * 0.8
+  }
+
+  /// 脂肪汇总显示（有上限，超出变红）
+  Widget _buildFatSummary(double totalFat) {
+    final limit = _fatUpperLimit.round();
+    final ratio = limit > 0 ? (totalFat / limit).clamp(0.0, 1.5) : 0.0;
+    final isOver = totalFat > limit;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${totalFat.toStringAsFixed(0)} / ≤$limit g',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isOver ? Colors.red : Colors.grey[600]),
+              ),
+              if (isOver) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.warning_amber_rounded,
+                    size: 14, color: Colors.red[700]),
+              ],
+            ],
+          ),
+          const SizedBox(height: 2),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: ratio.clamp(0.0, 1.0),
+              minHeight: 4,
+              backgroundColor: Colors.grey.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation(
+                  isOver ? Colors.red : Colors.orange[300]),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text('脂肪',
               style: TextStyle(fontSize: 10, color: Colors.grey[400])),
         ],
       ),
@@ -912,7 +1080,8 @@ class _TodayScreenState extends State<TodayScreen> {
                           const SizedBox(width: 4),
                           Text(
                             '碳水 ${totals.carbs.round()}/${meal.carbsG}g · '
-                            '蛋白质 ${totals.protein.round()}/${meal.proteinG}g',
+                            '蛋白质 ${totals.protein.round()}/${meal.proteinG}g'
+                            '${totals.fat > 0 ? ' · 脂肪 ${totals.fat.round()}g' : ''}',
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -976,6 +1145,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget _foodRow(int mealIdx, int idx, _FoodServing sv, Color color) {
     final calcCarbs = sv.food.carbsPer100G / 100 * sv.grams;
     final calcProtein = sv.food.proteinPer100G / 100 * sv.grams;
+    final calcFat = sv.food.fatPer100G / 100 * sv.grams;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -1108,6 +1278,16 @@ class _TodayScreenState extends State<TodayScreen> {
                     fontWeight: FontWeight.w500,
                     color: Colors.green[700]),
               ),
+              if (calcFat > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '脂肪 ${calcFat.toStringAsFixed(1)}g',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red[700]),
+                ),
+              ],
             ],
           ),
         ],
@@ -1256,19 +1436,23 @@ class _AllFoodPicker extends StatefulWidget {
 class _AllFoodPickerState extends State<_AllFoodPicker> {
   late List<_FoodGroup> _groups;
   String _query = '';
+  final Set<String> _expandedCategories = {};
 
   @override
   void initState() {
     super.initState();
     _groups = _buildGroups(widget.foods);
+    // 默认全部展开
+    for (final g in _groups) {
+      _expandedCategories.add(g.name);
+    }
   }
 
   List<_FoodGroup> _buildGroups(List<Food> foods) {
     // 按 subcategory → 食材名 分组
     final map = <String, List<Food>>{};
     for (final f in foods) {
-      final key = f.category;
-      map.putIfAbsent(key, () => []).add(f);
+      map.putIfAbsent(f.category, () => []).add(f);
     }
     // 主类排序：主食 → 蛋白质 → 其他
     final order = [
@@ -1279,11 +1463,15 @@ class _AllFoodPickerState extends State<_AllFoodPicker> {
     final result = <_FoodGroup>[];
     for (final cat in order) {
       if (map.containsKey(cat)) {
-        result.add(_FoodGroup(cat, map.remove(cat)!));
+        // 组内按优先级排序，相同优先级的保持原有顺序
+        final catFoods = map.remove(cat)!;
+        catFoods.sort((a, b) => a.priority.compareTo(b.priority));
+        result.add(_FoodGroup(cat, catFoods));
       }
     }
     // 剩余的
     for (final entry in map.entries) {
+      entry.value.sort((a, b) => a.priority.compareTo(b.priority));
       result.add(_FoodGroup(entry.key, entry.value));
     }
     return result;
@@ -1331,32 +1519,81 @@ class _AllFoodPickerState extends State<_AllFoodPicker> {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 4),
               children: filtered.expand((group) {
+                final isExpanded = _expandedCategories.contains(group.name);
                 return [
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Text(group.name,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[600],
-                        )),
+                  // 分类头（可折叠）
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isExpanded) {
+                          _expandedCategories.remove(group.name);
+                        } else {
+                          _expandedCategories.add(group.name);
+                        }
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(group.name,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[600],
+                                )),
+                          ),
+                          Icon(
+                            isExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            size: 18,
+                            color: Colors.grey[400],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  ...group.foods.map((f) => ListTile(
-                        dense: true,
-                        title: Text(f.name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500, fontSize: 14)),
-                        subtitle: Text(
-                          f.nutritionLabel,
-                          style:
-                              TextStyle(fontSize: 11, color: Colors.grey[500]),
-                        ),
-                        trailing: Icon(Icons.add_circle_outline,
-                            size: 22, color: Colors.grey[600]),
-                        onTap: () => widget.onPicked(f),
-                      )),
-                  const Divider(height: 1, indent: 16),
+                  if (isExpanded)
+                    ...group.foods.map((f) => ListTile(
+                          dense: true,
+                          title: Row(
+                            children: [
+                              Flexible(
+                                child: Text(f.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 14)),
+                              ),
+                              if (f.priority < 5) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('P${f.priority}',
+                                      style: TextStyle(
+                                          fontSize: 9,
+                                          color: Colors.green[600])),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Text(
+                            f.nutritionLabel,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[500]),
+                          ),
+                          trailing: Icon(Icons.add_circle_outline,
+                              size: 22, color: Colors.grey[600]),
+                          onTap: () => widget.onPicked(f),
+                        )),
                 ];
               }).toList(),
             ),

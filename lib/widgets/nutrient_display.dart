@@ -56,17 +56,17 @@ class NutrientComparisonRow extends StatelessWidget {
     return Row(children: [
       Expanded(
         child: _NutrientBox(
-          value: '${actualProtein.toStringAsFixed(1)}g',
-          subtitle: '蛋白质 · 目标 ${targetProtein.toStringAsFixed(1)}g',
-          color: Colors.orange,
+          value: '${actualCarbs.toStringAsFixed(1)}g',
+          subtitle: '碳水 · 目标 ${targetCarbs.toStringAsFixed(1)}g',
+          color: Colors.green,
         ),
       ),
       const SizedBox(width: 8),
       Expanded(
         child: _NutrientBox(
-          value: '${actualCarbs.toStringAsFixed(1)}g',
-          subtitle: '碳水 · 目标 ${targetCarbs.toStringAsFixed(1)}g',
-          color: Colors.green,
+          value: '${actualProtein.toStringAsFixed(1)}g',
+          subtitle: '蛋白质 · 目标 ${targetProtein.toStringAsFixed(1)}g',
+          color: Colors.orange,
         ),
       ),
     ]);

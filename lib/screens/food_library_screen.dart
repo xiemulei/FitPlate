@@ -30,14 +30,6 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
 
-  Set<String> get _presetIds => PresetFoods.all.map((f) => f.id).toSet();
-
-  List<Food> get _presetFoods =>
-      widget.foods.where((f) => _presetIds.contains(f.id)).toList();
-
-  List<Food> get _customFoods =>
-      widget.foods.where((f) => !_presetIds.contains(f.id)).toList();
-
   // ─────────────────────────────────────────────
   // 搜索结果
   // ─────────────────────────────────────────────
@@ -53,46 +45,50 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   // ─────────────────────────────────────────────
 
   List<_CategoryGroup> _buildGroups() {
-    final groups = <_CategoryGroup>[];
+    final byCat = <String, List<Food>>{};
+    for (final f in widget.foods) {
+      byCat.putIfAbsent(f.category, () => []).add(f);
+    }
 
-    // 预设食物 → 按分类 + 子类分组
-    for (final cat in PresetFoods.categories) {
-      final catFoods = _presetFoods.where((f) => f.category == cat).toList();
-      if (catFoods.isEmpty) continue;
+    // 自定义排序：主食 → 蛋白质-纯瘦肉 → 蛋白质-蛋白粉 → 其他
+    const catOrder = [
+      FoodCategory.staple,
+      FoodCategory.leanProtein,
+      FoodCategory.proteinPowder,
+    ];
+    final result = <_CategoryGroup>[];
 
-      final subs = PresetFoods.subcategoriesOf(cat);
+    void addCategory(String cat) {
+      final foods = byCat.remove(cat);
+      if (foods == null || foods.isEmpty) return;
+
       final subGroups = <_SubGroup>[];
       final unsubbed = <Food>[];
       final assignedIds = <String>{};
 
-      for (final sub in subs) {
-        final subFoods = catFoods.where((f) => f.subcategory == sub).toList();
-        if (subFoods.isNotEmpty) {
-          subGroups.add(_SubGroup(sub, subFoods));
-          assignedIds.addAll(subFoods.map((f) => f.id));
+      // 按子分类分组
+      for (final f in foods) {
+        if (f.subcategory != null && f.subcategory!.isNotEmpty) {
+          final sub = f.subcategory!;
+          final idx = subGroups.indexWhere((g) => g.name == sub);
+          if (idx != -1) {
+            subGroups[idx].foods.add(f);
+          } else {
+            subGroups.add(_SubGroup(sub, [f]));
+          }
+          assignedIds.add(f.id);
         }
       }
-      unsubbed.addAll(catFoods.where((f) => !assignedIds.contains(f.id)));
+      unsubbed.addAll(foods.where((f) => !assignedIds.contains(f.id)));
 
-      groups.add(_CategoryGroup(cat, subGroups, unsubbed));
+      result.add(_CategoryGroup(cat, subGroups, unsubbed));
     }
 
-    // 用户自定义食物 → 合并到已有分类末尾，或新建分类
-    final customByCat = <String, List<Food>>{};
-    for (final f in _customFoods) {
-      customByCat.putIfAbsent(f.category, () => []).add(f);
-    }
+    for (final cat in catOrder) addCategory(cat);
+    // 剩余分类
+    for (final cat in byCat.keys.toList()) addCategory(cat);
 
-    for (final entry in customByCat.entries) {
-      final idx = groups.indexWhere((g) => g.category == entry.key);
-      if (idx != -1) {
-        groups[idx].unsubcategorized.addAll(entry.value);
-      } else {
-        groups.add(_CategoryGroup(entry.key, [], entry.value));
-      }
-    }
-
-    return groups;
+    return result;
   }
 
   // ─────────────────────────────────────────────
@@ -261,7 +257,6 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   // ── 食物卡片 ──
 
   Widget _buildFoodCard(ThemeData theme, Food food) {
-    final isCustom = !_presetIds.contains(food.id);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
@@ -284,20 +279,6 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
                   style:
                       const TextStyle(fontWeight: FontWeight.w600)),
             ),
-            if (isCustom) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text('自定义',
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.onTertiaryContainer)),
-              ),
-            ],
             const SizedBox(width: 4),
             Text('(${food.unitLabel})',
                 style: TextStyle(color: Colors.grey[500], fontSize: 11)),

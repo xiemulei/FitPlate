@@ -103,6 +103,7 @@ class UserProfile {
   double proteinPerKg;
   double carbsPerKg;        // 训练日碳水系数
   double restCarbsPerKg;    // 休息日碳水系数
+  double fatPerKg;          // 脂肪上限系数
 
   UserProfile({
     this.height = 170,
@@ -115,15 +116,19 @@ class UserProfile {
     double? proteinPerKg,
     double? carbsPerKg,
     double? restCarbsPerKg,
+    double? fatPerKg,
   })  : proteinPerKg = proteinPerKg ?? defaultProteinPerKg(goal),
         carbsPerKg = carbsPerKg ?? defaultCarbsPerKg(goal),
-        restCarbsPerKg = restCarbsPerKg ?? carbsPerKg ?? defaultCarbsPerKg(goal);
+        restCarbsPerKg = restCarbsPerKg ?? carbsPerKg ?? defaultCarbsPerKg(goal),
+        fatPerKg = fatPerKg ?? defaultFatPerKg;
 
   static double defaultProteinPerKg(FitnessGoal g) =>
       g == FitnessGoal.fatLoss ? 2.0 : 1.8;
 
   static double defaultCarbsPerKg(FitnessGoal g) =>
       g == FitnessGoal.fatLoss ? 1.5 : 4.0;
+
+  static double get defaultFatPerKg => 0.8;
 
   /// 当目标切换时重置为默认值（用户尚未手动调节时）
   void applyGoalDefaults() {
@@ -134,6 +139,7 @@ class UserProfile {
   double get dailyProtein => weight * proteinPerKg;
   double get dailyCarbs => weight * carbsPerKg;
   double get dailyRestCarbs => weight * restCarbsPerKg;
+  double get dailyFat => weight * fatPerKg;
 
   bool get showNoStrengthOption => goal == FitnessGoal.fatLoss;
 
@@ -148,6 +154,7 @@ class UserProfile {
     double? proteinPerKg,
     double? carbsPerKg,
     double? restCarbsPerKg,
+    double? fatPerKg,
   }) =>
       UserProfile(
         height: height ?? this.height,
@@ -160,6 +167,7 @@ class UserProfile {
         proteinPerKg: proteinPerKg ?? this.proteinPerKg,
         carbsPerKg: carbsPerKg ?? this.carbsPerKg,
         restCarbsPerKg: restCarbsPerKg ?? this.restCarbsPerKg,
+        fatPerKg: fatPerKg ?? this.fatPerKg,
       );
 
   Map<String, dynamic> toJson() => {
@@ -173,6 +181,7 @@ class UserProfile {
         'proteinPerKg': proteinPerKg,
         'carbsPerKg': carbsPerKg,
         'restCarbsPerKg': restCarbsPerKg,
+        'fatPerKg': fatPerKg,
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
@@ -191,5 +200,6 @@ class UserProfile {
         proteinPerKg: (j['proteinPerKg'] as num?)?.toDouble(),
         carbsPerKg: (j['carbsPerKg'] as num?)?.toDouble(),
         restCarbsPerKg: (j['restCarbsPerKg'] as num?)?.toDouble(),
+        fatPerKg: (j['fatPerKg'] as num?)?.toDouble(),
       );
 }

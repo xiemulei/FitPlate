@@ -37,15 +37,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final t = await StorageService.loadTemplates();
     final pr = await StorageService.loadProfile();
     final c = await StorageService.loadCycles();
-    final customFoods = await StorageService.loadFoods();
+    var foods = await StorageService.loadFoods();
+    // 首次启动：foods.json 为空 → 写入预设食品
+    if (foods.isEmpty) {
+      foods = List.from(PresetFoods.all);
+      await StorageService.saveFoods(foods);
+    }
     setState(() {
       _templates = t;
       _cycles = c;
       _profile = pr;
-      _foods = [
-        ...PresetFoods.all,
-        ...customFoods.where((f) => !PresetFoods.all.any((p) => p.id == f.id)),
-      ];
+      _foods = foods;
     });
   }
 
@@ -61,8 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _onFoodsChanged(List<Food> foods) async {
     setState(() => _foods = foods);
-    await StorageService.saveFoods(
-        foods.where((f) => !PresetFoods.all.contains(f)).toList());
+    await StorageService.saveFoods(foods);
   }
 
   Future<void> _addFood() async {
@@ -73,8 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (result != null) {
       final foods = [..._foods, result];
       setState(() => _foods = foods);
-      await StorageService.saveFoods(
-          foods.where((f) => !PresetFoods.all.contains(f)).toList());
+      await StorageService.saveFoods(foods);
     }
   }
 

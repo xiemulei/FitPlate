@@ -18,10 +18,12 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _proteinCtrl;
   late TextEditingController _carbsCtrl;
+  late TextEditingController _fatCtrl;
   late TextEditingController _gramsPerUnitCtrl;
   late FoodUnit _unit;
   late String _category;
   late String? _subcategory;
+  late int _priority;
   bool get _isNew => widget.food == null;
 
   @override
@@ -35,6 +37,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     _gramsPerUnitCtrl = TextEditingController(
       text: f?.gramsPerUnit?.toStringAsFixed(1) ?? '',
     );
+    _priority = f?.priority ?? 5;
 
     // 按件计的食物 → 控件显示每单位营养值
     if (f != null && _unit.isItemUnit && (f.gramsPerUnit ?? 0) > 0) {
@@ -44,12 +47,18 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       _carbsCtrl = TextEditingController(
         text: f.carbsPerUnit.toStringAsFixed(1),
       );
+      _fatCtrl = TextEditingController(
+        text: f.fatPerUnit.toStringAsFixed(1),
+      );
     } else {
       _proteinCtrl = TextEditingController(
         text: f?.proteinPer100G.toStringAsFixed(1) ?? '0.0',
       );
       _carbsCtrl = TextEditingController(
         text: f?.carbsPer100G.toStringAsFixed(1) ?? '0.0',
+      );
+      _fatCtrl = TextEditingController(
+        text: f?.fatPer100G.toStringAsFixed(1) ?? '0.0',
       );
     }
   }
@@ -59,6 +68,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     _nameCtrl.dispose();
     _proteinCtrl.dispose();
     _carbsCtrl.dispose();
+    _fatCtrl.dispose();
     _gramsPerUnitCtrl.dispose();
     super.dispose();
   }
@@ -69,6 +79,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 
     double protein;
     double carbs;
+    double fat;
     final gpuText = _gramsPerUnitCtrl.text.trim();
     final gpu = _unit.isItemUnit && gpuText.isNotEmpty
         ? double.tryParse(gpuText)
@@ -78,11 +89,14 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       // 用户输入的是每单位营养值 → 转成每100g存储
       final p = double.tryParse(_proteinCtrl.text) ?? 0.0;
       final c = double.tryParse(_carbsCtrl.text) ?? 0.0;
+      final f = double.tryParse(_fatCtrl.text) ?? 0.0;
       protein = p / gpu * 100;
       carbs = c / gpu * 100;
+      fat = f / gpu * 100;
     } else {
       protein = double.tryParse(_proteinCtrl.text) ?? 0.0;
       carbs = double.tryParse(_carbsCtrl.text) ?? 0.0;
+      fat = double.tryParse(_fatCtrl.text) ?? 0.0;
     }
 
     return Food(
@@ -91,9 +105,11 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       unit: _unit,
       proteinPer100G: protein,
       carbsPer100G: carbs,
+      fatPer100G: fat,
       category: _category,
       subcategory: _subcategory,
       gramsPerUnit: gpu,
+      priority: _priority,
     );
   }
 
@@ -276,6 +292,60 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             ),
           if (_category == FoodCategory.staple) const SizedBox(height: 20),
 
+          // 优先级
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text('优先级',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[600])),
+              const SizedBox(width: 8),
+              Text('$_priority',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: _priority <= 3
+                          ? Colors.green
+                          : _priority <= 6
+                              ? Colors.orange
+                              : Colors.grey)),
+            ],
+          ),
+          Slider(
+            value: _priority.toDouble(),
+            min: 0,
+            max: 10,
+            divisions: 10,
+            label: '$_priority',
+            onChanged: (v) => setState(() => _priority = v.round()),
+          ),
+          const SizedBox(height: 8),
+
+          // 碳水
+          TextField(
+            controller: _carbsCtrl,
+            decoration: InputDecoration(
+              labelText: '碳水',
+              hintText: _unit.isItemUnit
+                  ? '每${_unit.label}含多少克碳水'
+                  : '每 100g 含多少克碳水',
+              border: const OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.grain),
+              suffixText: _unit.isItemUnit ? 'g/${_unit.label}' : 'g/100g',
+              suffixStyle: TextStyle(color: Colors.grey[500]),
+              helperText: _unit.isItemUnit
+                  ? '填写每${_unit.label}的碳水含量'
+                  : null,
+              helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 20),
+
           // 蛋白质
           TextField(
             controller: _proteinCtrl,
@@ -294,25 +364,25 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _save(),
           ),
           const SizedBox(height: 20),
 
-          // 碳水
+          // 脂肪
           TextField(
-            controller: _carbsCtrl,
+            controller: _fatCtrl,
             decoration: InputDecoration(
-              labelText: '碳水',
+              labelText: '脂肪',
               hintText: _unit.isItemUnit
-                  ? '每${_unit.label}含多少克碳水'
-                  : '每 100g 含多少克碳水',
+                  ? '每${_unit.label}含多少克脂肪'
+                  : '每 100g 含多少克脂肪',
               border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.grain),
+              prefixIcon: const Icon(Icons.water_drop),
               suffixText: _unit.isItemUnit ? 'g/${_unit.label}' : 'g/100g',
               suffixStyle: TextStyle(color: Colors.grey[500]),
               helperText: _unit.isItemUnit
-                  ? '填写每${_unit.label}的碳水含量'
+                  ? '填写每${_unit.label}的脂肪含量'
                   : null,
               helperStyle: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
@@ -333,16 +403,20 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                       style: theme.textTheme.titleSmall),
                   const SizedBox(height: 12),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      _nutrientCol(
+                          '碳水',
+                          '${double.tryParse(_carbsCtrl.text)?.toStringAsFixed(1) ?? '0.0'}g',
+                          Colors.green),
                       _nutrientCol(
                           '蛋白质',
                           '${double.tryParse(_proteinCtrl.text)?.toStringAsFixed(1) ?? '0.0'}g',
                           Colors.orange),
                       _nutrientCol(
-                          '碳水',
-                          '${double.tryParse(_carbsCtrl.text)?.toStringAsFixed(1) ?? '0.0'}g',
-                          Colors.green),
+                          '脂肪',
+                          '${double.tryParse(_fatCtrl.text)?.toStringAsFixed(1) ?? '0.0'}g',
+                          Colors.red),
                     ],
                   ),
                   if (_unit.isItemUnit && _gramsPerUnitCtrl.text.trim().isNotEmpty) ...[
