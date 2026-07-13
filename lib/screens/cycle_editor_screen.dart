@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/cycle.dart';
 import '../models/user_profile.dart';
+import '../models/meal_plan_template.dart';
 import '../data/meal_distribution.dart';
+import '../services/storage_service.dart';
 import 'training_time_picker_screen.dart';
 
 class CycleEditorScreen extends StatefulWidget {
@@ -23,12 +25,27 @@ class CycleEditorScreen extends StatefulWidget {
 class _CycleEditorScreenState extends State<CycleEditorScreen> {
   late TrainingCycle _cycle;
   late TextEditingController _nameCtrl;
+  MealPlanTemplate? _customTemplate;
 
   @override
   void initState() {
     super.initState();
     _cycle = widget.cycle;
     _nameCtrl = TextEditingController(text: _cycle.name);
+    _loadCustomTemplate();
+  }
+
+  Future<void> _loadCustomTemplate() async {
+    if (_cycle.mealPlanTemplateId == null) return;
+    final templates = await StorageService.loadMealPlanTemplates();
+    final match = templates
+        .where((t) => t.id == _cycle.mealPlanTemplateId)
+        .firstOrNull;
+    if (mounted && match != null) {
+      setState(() {
+        _customTemplate = match;
+      });
+    }
   }
 
   @override
@@ -311,6 +328,11 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
 
   // ── 配餐方案卡 ──
   Widget _buildTrainingTimeCard(ThemeData theme) {
+    // 优先检查自定义方案
+    if (_cycle.mealPlanTemplateId != null) {
+      return _buildCustomTemplateCard(theme);
+    }
+
     final effectiveTime =
         _cycle.trainingTime ?? widget.profile?.trainingTime;
     if (effectiveTime == null) {
@@ -467,21 +489,217 @@ class _CycleEditorScreenState extends State<CycleEditorScreen> {
     );
   }
 
+  // ── 自定义方案预览卡 ──
+  Widget _buildCustomTemplateCard(ThemeData theme) {
+    final profile = widget.profile;
+    final dailyCarbs =
+        profile != null ? profile.weight * profile.carbsPerKg : null;
+    final dailyRestCarbs =
+        profile != null ? profile.weight * profile.restCarbsPerKg : null;
+    final dailyProtein =
+        profile != null ? profile.weight * profile.proteinPerKg : null;
+
+    // 模板尚未加载完成
+    if (_customTemplate == null) {
+      return Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              child: Row(
+                children: [
+                  const Text('📝', style: TextStyle(fontSize: 20)),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('自定义方案加载中…',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14)),
+                  ),
+                  TextButton(
+                    onPressed: _changeTrainingTime,
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                    child: const Text('换方案',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final template = _customTemplate!;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 头部
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            child: Row(
+              children: [
+                const Text('📝', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('配餐方案: ${template.name}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 14)),
+                ),
+                TextButton(
+                  onPressed: _changeTrainingTime,
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                  child: const Text('换方案',
+                      style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          // 训练日
+          _slotPreviewGroup('🏋️ 训练日配餐', template.trainingMeals,
+              dailyCarbs, dailyProtein, Colors.orange),
+          const Divider(height: 1, indent: 14, endIndent: 14),
+          // 休息日
+          _slotPreviewGroup('😴 休息日配餐', template.restMeals,
+              dailyRestCarbs, dailyProtein, Colors.blue),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ── 自定义方案餐次预览（MealSlotDef） ──
+  Widget _slotPreviewGroup(String title, List<MealSlotDef> meals,
+      double? dailyCarbs, double? dailyProtein, Color accent) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: accent)),
+          const SizedBox(height: 4),
+          ...meals.asMap().entries.map((e) {
+            final m = e.value;
+            final carbG = dailyCarbs != null
+                ? (dailyCarbs * m.carbRatio).round()
+                : null;
+            final proteinG = dailyProtein != null
+                ? (dailyProtein * m.proteinRatio).round()
+                : null;
+            final name =
+                m.name.replaceAll(RegExp(r'[①②③④⑤]'), '').trim();
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: Text(name,
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  const Spacer(),
+                  if (carbG != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('C ${carbG}g',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange[800])),
+                    ),
+                  const SizedBox(width: 4),
+                  if (proteinG != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('P ${proteinG}g',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[800])),
+                    ),
+                  if (carbG == null)
+                    Text(
+                        '碳水${(m.carbRatio * 100).round()}% 蛋白${(m.proteinRatio * 100).round()}%',
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.grey[500])),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
   void _changeTrainingTime() async {
     final effectiveTime =
         _cycle.trainingTime ?? widget.profile?.trainingTime;
-    final result = await Navigator.push<TrainingTime>(
+    final result = await Navigator.push<MealPlanSelection>(
       context,
       MaterialPageRoute(
         builder: (_) => TrainingTimePickerScreen(
           profile: widget.profile,
           current: effectiveTime,
+          currentTemplateId: _cycle.mealPlanTemplateId,
         ),
       ),
     );
-    if (result != null && result != _cycle.trainingTime) {
+    if (result == null) return;
+
+    if (result.templateId != null) {
+      // 选择了自定义方案
       setState(() {
-        _cycle = _cycle.copyWith(trainingTime: result);
+        _cycle = _cycle.copyWith(
+          mealPlanTemplateId: result.templateId,
+        );
+        // 直接置空 trainingTime（copyWith 用 ?? 无法清空）
+        _cycle.trainingTime = null;
+      });
+      _loadCustomTemplate();
+    } else if (result.trainingTime != null &&
+        result.trainingTime != _cycle.trainingTime) {
+      // 选择了预设方案
+      setState(() {
+        _cycle = _cycle.copyWith(
+          trainingTime: result.trainingTime,
+        );
+        // 直接置空 mealPlanTemplateId（copyWith 用 ?? 无法清空）
+        _cycle.mealPlanTemplateId = null;
+        _customTemplate = null;
       });
     }
   }

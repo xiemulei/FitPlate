@@ -2,6 +2,7 @@ import '../models/user_profile.dart';
 import '../models/cycle.dart';
 import '../models/food.dart';
 import '../models/meal_plan.dart';
+import '../models/meal_plan_template.dart';
 import '../data/meal_distribution.dart';
 
 /// 根据训练循环 + 个人资料动态生成每日配餐目标
@@ -14,9 +15,15 @@ class MealPlanService {
   static List<MealPlanEntry>? getTodayMeals({
     required TrainingCycle activeCycle,
     required UserProfile profile,
+    MealPlanTemplate? customTemplate,
   }) {
     final todayDay = activeCycle.todayDay;
     if (todayDay == null) return null;
+
+    // 如果有自定义方案，优先使用
+    if (customTemplate != null) {
+      return _entriesFromTemplate(customTemplate, todayDay.isRestDay, profile);
+    }
 
     return generateDayMeals(
       isRestDay: todayDay.isRestDay,
@@ -29,8 +36,14 @@ class MealPlanService {
   static List<List<MealPlanEntry>> generateCycleMeals({
     required TrainingCycle cycle,
     required UserProfile profile,
+    MealPlanTemplate? customTemplate,
   }) {
     return cycle.days.map((day) {
+      // 如果有自定义方案，优先使用
+      if (customTemplate != null) {
+        return _entriesFromTemplate(customTemplate, day.isRestDay, profile);
+      }
+
       return generateDayMeals(
         isRestDay: day.isRestDay,
         profile: profile,
@@ -39,7 +52,7 @@ class MealPlanService {
     }).toList();
   }
 
-  /// 单日生成
+  /// 单日生成（预设方案）
   static List<MealPlanEntry> generateDayMeals({
     required bool isRestDay,
     required UserProfile profile,
@@ -70,6 +83,15 @@ class MealPlanService {
     return entries;
   }
 
+  /// 从自定义模板生成单日配餐
+  /// isRestDay 为 true 用 restMeals，false 用 trainingMeals
+  static List<MealPlanEntry> _entriesFromTemplate(
+      MealPlanTemplate template, bool isRestDay, UserProfile profile) {
+    final slots = isRestDay ? template.restMeals : template.trainingMeals;
+    final dailyCarbs = isRestDay ? profile.dailyRestCarbs : profile.dailyCarbs;
+    return slots.map((slot) => _slotToEntry(slot, profile, dailyCarbs, isRestDay)).toList();
+  }
+
   static MealPlanEntry _toEntry(MealPortion portion, UserProfile profile, {bool isRestDay = false}) {
     final label = portion.name.replaceAll(RegExp(r'[①②③④⑤]'), '').trim();
     final dailyCarbs = isRestDay ? profile.dailyRestCarbs : profile.dailyCarbs;
@@ -78,6 +100,18 @@ class MealPlanService {
       label: label,
       proteinG: (profile.dailyProtein * portion.proteinRatio).round(),
       carbsG: (dailyCarbs * portion.carbRatio).round(),
+    );
+  }
+
+  /// 将 MealSlotDef 转换为 MealPlanEntry
+  static MealPlanEntry _slotToEntry(
+      MealSlotDef slot, UserProfile profile, double dailyCarbs, bool isRestDay) {
+    final label = slot.name.replaceAll(RegExp(r'[①②③④⑤]'), '').trim();
+    return MealPlanEntry(
+      type: _matchMealType(slot.name),
+      label: label,
+      proteinG: (profile.dailyProtein * slot.proteinRatio).round(),
+      carbsG: (dailyCarbs * slot.carbRatio).round(),
     );
   }
 

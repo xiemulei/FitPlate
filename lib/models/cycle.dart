@@ -54,7 +54,8 @@ class TrainingCycle {
   String? startDate;
   bool isActive;
   TrainingTime? trainingTime; // 覆盖 UserProfile 中的训练时间设置
-  Map<int, DayOverrideType> overrides; // dayIndex → 覆盖类型
+  String? mealPlanTemplateId; // 自定义配餐方案ID（与 trainingTime 互斥）
+  Map<int, DayOverrideType> overrides; // dayIndex -> 覆盖类型
 
   TrainingCycle({
     required this.id,
@@ -64,6 +65,7 @@ class TrainingCycle {
     this.startDate,
     this.isActive = false,
     this.trainingTime,
+    this.mealPlanTemplateId,
     Map<int, DayOverrideType>? overrides,
   }) : overrides = overrides ?? {};
 
@@ -75,6 +77,7 @@ class TrainingCycle {
     String? startDate,
     bool? isActive,
     TrainingTime? trainingTime,
+    String? mealPlanTemplateId,
     Map<int, DayOverrideType>? overrides,
   }) {
     return TrainingCycle(
@@ -85,6 +88,7 @@ class TrainingCycle {
       startDate: startDate ?? this.startDate,
       isActive: isActive ?? this.isActive,
       trainingTime: trainingTime ?? this.trainingTime,
+      mealPlanTemplateId: mealPlanTemplateId ?? this.mealPlanTemplateId,
       overrides: overrides ?? Map<int, DayOverrideType>.from(this.overrides),
     );
   }
@@ -150,6 +154,7 @@ class TrainingCycle {
         'startDate': startDate,
         'isActive': isActive,
         'trainingTime': trainingTime?.name,
+        'mealPlanTemplateId': mealPlanTemplateId,
         if (overrides.isNotEmpty)
           'overrides': overrides.map((k, v) => MapEntry(k.toString(), v.name)),
       };
@@ -169,6 +174,7 @@ class TrainingCycle {
               orElse: () => TrainingTime.afterLunch,
             )
           : null,
+      mealPlanTemplateId: j['mealPlanTemplateId'],
       overrides: rawOverrides != null
           ? rawOverrides.map((k, v) =>
               MapEntry(int.parse(k), DayOverrideType.values.firstWhere(

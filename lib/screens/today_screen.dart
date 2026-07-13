@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../models/meal_plan.dart';
+import '../models/meal_plan_template.dart';
 import '../models/cycle.dart';
 import '../models/user_profile.dart';
 import '../models/daily_log.dart';
@@ -35,11 +36,12 @@ class TodayScreen extends StatefulWidget {
 
 class _TodayScreenState extends State<TodayScreen>
     with WidgetsBindingObserver {
-  // 每餐的食物选择 — keyed by "mealIndex"
+  // 每餐的食物选择 - keyed by "mealIndex"
   final Map<int, List<_FoodServing>> _selections = {};
   int? _expandedMealIndex;
   bool _loaded = false;
   String _lastLoadedDate = '';
+  MealPlanTemplate? _customTemplate;
 
   @override
   void didUpdateWidget(TodayScreen old) {
@@ -80,8 +82,18 @@ class _TodayScreenState extends State<TodayScreen>
 
     final todayStr = DailyFoodLog.todayDate();
 
-    // 日期变了 → 清空上一日的内存数据
+    // 日期变了 -> 清空上一日的内存数据
     _lastLoadedDate = todayStr;
+
+    // 加载自定义配餐方案（如果有）
+    if (active.mealPlanTemplateId != null) {
+      final templates = await StorageService.loadMealPlanTemplates();
+      _customTemplate = templates
+          .where((t) => t.id == active.mealPlanTemplateId)
+          .firstOrNull;
+    } else {
+      _customTemplate = null;
+    }
 
     // 每轮循环开始自动清空上一轮的覆盖
     if (active.todayIndex == 0 && active.overrides.isNotEmpty) {
@@ -187,6 +199,16 @@ class _TodayScreenState extends State<TodayScreen>
     final active = _activeCycle;
     final profile = widget.profile;
     if (active == null || profile == null) return null;
+
+    // 如果循环设置了自定义方案，使用它
+    if (_customTemplate != null) {
+      return MealPlanService.getTodayMeals(
+        activeCycle: active,
+        profile: profile,
+        customTemplate: _customTemplate,
+      );
+    }
+
     return MealPlanService.generateDayMeals(
       isRestDay: active.todayDay?.isRestDay ?? false,
       profile: profile,
