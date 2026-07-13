@@ -756,14 +756,13 @@ class _TodayScreenState extends State<TodayScreen>
   }
 
   Widget _buildDailySummary(List<MealPlanEntry> meals, ThemeData theme) {
-    double totalCarbs = 0, totalProtein = 0, totalFat = 0, totalGrams = 0;
+    double totalCarbs = 0, totalProtein = 0, totalFat = 0;
     int mealsWithFood = 0;
     for (final entry in _selections.entries) {
       for (final sv in entry.value) {
         totalCarbs += sv.food.carbsPer100G / 100 * sv.grams;
         totalProtein += sv.food.proteinPer100G / 100 * sv.grams;
         totalFat += sv.food.fatPer100G / 100 * sv.grams;
-        totalGrams += sv.grams;
       }
       if (entry.value.isNotEmpty) mealsWithFood++;
     }
@@ -801,8 +800,6 @@ class _TodayScreenState extends State<TodayScreen>
                 const SizedBox(width: 16),
                 // 脂肪 — 按体重估算上限，超出提示
                 _buildFatSummary(totalFat),
-                const SizedBox(width: 16),
-                _summaryItemG('食物量', totalGrams, Colors.grey),
               ],
             ),
             // 脂肪超量提示
@@ -914,24 +911,6 @@ class _TodayScreenState extends State<TodayScreen>
           ),
           const SizedBox(height: 2),
           Text('脂肪',
-              style: TextStyle(fontSize: 10, color: Colors.grey[400])),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryItemG(String label, double grams, Color color) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('${grams.round()} g',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
-          const SizedBox(height: 8),
-          Text(label,
               style: TextStyle(fontSize: 10, color: Colors.grey[400])),
         ],
       ),
