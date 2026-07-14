@@ -45,10 +45,10 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
     await StorageService.saveMealPlanTemplates(_userTemplates);
   }
 
-  void _copyTemplate(MealPlanTemplate src) {
+  void _copyTemplate(MealPlanTemplate src, {String? name}) {
     final copy = MealPlanTemplate(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: '${src.name} 副本',
+      name: name ?? '${src.name} 副本',
       trainingMeals: src.trainingMeals
           .map((m) => MealSlotDef(
                 name: m.name,
@@ -94,6 +94,12 @@ class _MealPlannerScreenState extends State<MealPlannerScreen> {
   }
 
   void _openEditor([MealPlanTemplate? existing]) async {
+    // 内置方案不可直接编辑，先创建副本（新ID、isBuiltIn=false）
+    if (existing != null && existing.isBuiltIn) {
+      _copyTemplate(existing, name: existing.name);
+      return;
+    }
+
     final result = await Navigator.push<MealPlanTemplate>(
       context,
       MaterialPageRoute(
